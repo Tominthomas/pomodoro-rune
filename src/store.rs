@@ -144,7 +144,6 @@ impl Store {
         self.send(key, Some(Box::new(move || serde_json::to_value(&value).map_err(|e| e.to_string()))));
     }
 
-    /// Queues `key` to be removed.
     pub fn remove(&self, key: &str) {
         self.send(key, None);
     }

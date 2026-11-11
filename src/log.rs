@@ -214,7 +214,6 @@ pub struct Log {
 }
 
 impl Log {
-    /// The serial the next block recorded will have.
     pub fn next(&self) -> u64 {
         self.next
     }
