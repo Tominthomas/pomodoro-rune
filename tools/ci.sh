@@ -13,6 +13,8 @@ step "cargo fmt --check"
 cargo fmt --check
 step "cargo clippy"
 cargo clippy --locked --all-targets --release -- -D warnings
+step "cargo doc"
+RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --document-private-items --release
 step "cargo test"
 cargo test --locked --release
 step "ruff"
