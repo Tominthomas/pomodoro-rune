@@ -102,6 +102,10 @@ impl Store {
                 }
                 // A flush with nothing queued writes nothing, so it can't say a failure is over.
                 if !pending.is_empty() {
+                    #[expect(
+                        clippy::let_underscore_must_use,
+                        reason = "the watchdog only reports; saving goes on without it"
+                    )]
                     let _ = watch.send(Writing::Began);
                     let mut error = None;
                     for (key, value) in pending {
@@ -114,9 +118,14 @@ impl Store {
                         }
                     }
                     failed.clone_from(&error);
+                    #[expect(
+                        clippy::let_underscore_must_use,
+                        reason = "the watchdog only reports; saving goes on without it"
+                    )]
                     let _ = watch.send(Writing::Ended(error));
                 }
                 for ack in acks {
+                    #[expect(clippy::let_underscore_must_use, reason = "a flush that timed out has stopped listening")]
                     let _ = ack.send(failed.clone());
                 }
             }
@@ -142,6 +151,10 @@ impl Store {
 
     fn send(&self, key: &str, value: Option<Encode>) {
         if let Some(tx) = &self.tx {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "only a panicked writer drops this, and flush reports that"
+            )]
             let _ = tx.send(Msg::Set(key.to_owned(), value));
         }
     }
@@ -177,6 +190,10 @@ mod tests {
         let seen = written.clone();
         let store = Store::spawn(
             move |key, value| {
+                #[expect(
+                    clippy::let_underscore_must_use,
+                    reason = "a write past the three opened goes ahead after the timeout"
+                )]
                 let _ = gate.lock().unwrap().recv_timeout(Duration::from_secs(2));
                 seen.lock().unwrap().push((key.to_owned(), value.unwrap_or_default()));
                 Ok(())
@@ -190,7 +207,7 @@ mod tests {
         store.set("log", 3);
         assert!(started.elapsed() < Duration::from_millis(200), "the caller never waits on the disk");
         for _ in 0..3 {
-            let _ = open.send(());
+            open.send(()).unwrap();
         }
         assert_eq!(store.flush(Duration::from_secs(5)), Ok(()));
         let written = written.lock().unwrap().clone();
@@ -239,7 +256,7 @@ mod tests {
         let store = Store::spawn(
             move |_, _| {
                 entered.send(()).unwrap();
-                let _ = gate.lock().unwrap().recv();
+                gate.lock().unwrap().recv().unwrap();
                 Ok(())
             },
             move |e| said.send(e).unwrap(),
@@ -250,7 +267,7 @@ mod tests {
         assert_eq!(store.flush(Duration::from_millis(300)), Err("still being written".into()), "the flush gives up");
         assert!(started.elapsed() < Duration::from_secs(1));
         assert_eq!(heard.recv_timeout(STALL * 2), Ok(Some("still saving".to_owned())));
-        let _ = open.send(());
+        open.send(()).unwrap();
         assert_eq!(store.flush(Duration::from_secs(2)), Ok(()));
         assert_eq!(heard.recv_timeout(Duration::from_secs(5)), Ok(None), "and the recovery is heard");
         let started = Instant::now();
@@ -271,6 +288,7 @@ mod tests {
         assert_eq!(back.get::<(u32, u32, u32)>("lengths"), Some((25, 5, 15)));
         assert!(!back.contains("log"), "a removal queued after a value wins");
         drop(store);
+        #[expect(clippy::let_underscore_must_use, reason = "cleanup of a temporary directory is best effort")]
         let _ = std::fs::remove_dir_all(dir);
     }
 }

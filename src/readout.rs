@@ -199,7 +199,7 @@ fn label(s: &State, k: Ink) -> El {
     } else {
         QUIET
     };
-    let full = named.clone().unwrap_or_else(|| "+ name this block".into());
+    let full = named.unwrap_or_else(|| "+ name this block".into());
     let el = row()
         .key("top")
         .h(17.0)

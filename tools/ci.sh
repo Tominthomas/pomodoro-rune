@@ -12,9 +12,9 @@ command -v ruff >/dev/null 2>&1 || ruff() { pipx run ruff "$@"; }
 step "cargo fmt --check"
 cargo fmt --check
 step "cargo clippy"
-cargo clippy --all-targets --release -- -D warnings
+cargo clippy --locked --all-targets --release -- -D warnings
 step "cargo test"
-cargo test --release
+cargo test --locked --release
 step "ruff"
 ruff format --check tools
 ruff check tools
@@ -31,6 +31,6 @@ if [ -n "$skip" ]; then
   exit 0
 fi
 step "headless checks"
-cargo build --release
+cargo build --locked --release
 python3 tools/check.py
 python3 tools/contrast.py
