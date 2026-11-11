@@ -196,39 +196,65 @@ fn pick_place(s: &mut State, tx: &mut Tx) {
     });
 }
 
-const KEYS: [(&str, &str); 12] = [
-    ("Space", "start, pause or resume"),
-    ("↑  ↓", "a minute longer or shorter, while it waits"),
-    ("drag", "the sun up or down to set the length; space starts it"),
-    ("S", "let go of a block, or skip a break"),
-    ("U", "undo a let go, until you start again"),
-    ("L", "name the next block"),
-    ("1  2  3", "how it felt: deep, steady, drifting"),
-    ("H", "Today and the last four weeks"),
-    ("T", "the next place"),
-    ("Tab", "show the controls"),
-    ("?", "these keys"),
-    ("Esc", "close"),
+/// Every key, grouped by what it is for: the timer, the block, and finding your way around.
+const KEYS: [(&str, &[(&str, &str)]); 3] = [
+    (
+        "Timer",
+        &[
+            ("Space", "start, pause or resume"),
+            ("↑  ↓", "a minute longer or shorter, while it waits"),
+            ("drag", "the sun up or down to set the length; space starts it"),
+            ("S", "let go of a block, or skip a break"),
+        ],
+    ),
+    (
+        "Block",
+        &[
+            ("U", "undo a let go, until you start again"),
+            ("L", "name the next block"),
+            ("1  2  3", "how it felt: deep, steady, drifting"),
+        ],
+    ),
+    (
+        "Explore",
+        &[
+            ("H", "Today and the last four weeks"),
+            ("T", "the next place"),
+            ("Tab", "show the controls"),
+            ("?  Esc", "these keys, and close what's open"),
+        ],
+    ),
 ];
 
 /// Every key on one card, over a dimmed scene, and under them the last bell's words.
 pub fn keys(status: Option<El>) -> El {
     // Each row wraps its description and grows, so nothing runs past the card.
-    let rows = KEYS.iter().enumerate().fold(col().gap(8.0), |c, (i, (k, what))| {
+    let mut n = 0;
+    let groups = KEYS.iter().fold(col().gap(14.0), |c, (group, rows)| {
+        let rows = rows.iter().fold(col().gap(7.0), |c, (k, what)| {
+            n += 1;
+            c.child(
+                row()
+                    .key(format!("key-row-{n}"))
+                    .gap(12.0)
+                    .items_start()
+                    .child(el().w(58.0).child(line(Ink::light(), *k, SMALL, 600.0, BRIGHT)))
+                    .child(
+                        text(what.to_string())
+                            .key(format!("key-what-{n}"))
+                            .font(TextStyle::new(SMALL, 450.0))
+                            .color(Ink::light().text.alpha(QUIET))
+                            .wrap()
+                            .w(214.0),
+                    ),
+            )
+        });
         c.child(
-            row()
-                .key(format!("key-row-{i}"))
-                .gap(12.0)
-                .items_start()
-                .child(el().w(58.0).child(line(Ink::light(), *k, SMALL, 600.0, BRIGHT)))
-                .child(
-                    text(what.to_string())
-                        .key(format!("key-what-{i}"))
-                        .font(TextStyle::new(SMALL, 450.0))
-                        .color(Ink::light().text.alpha(QUIET))
-                        .wrap()
-                        .w(214.0),
-                ),
+            col()
+                .key(format!("keys-{}", group.to_lowercase()))
+                .gap(7.0)
+                .child(line(Ink::light(), *group, 10.5, 640.0, QUIET).role("heading"))
+                .child(rows),
         )
     });
     let card = col()
@@ -243,7 +269,7 @@ pub fn keys(status: Option<El>) -> El {
         .child(row().justify_between().center_y().child(line(Ink::light(), "Keys", 15.0, 520.0, BRIGHT)).child(
             button(Ink::light(), "keys-close", "Close", "Close  Esc").on_press_tx(guarded(|s, _| s.keys_open = false)),
         ))
-        .child(rows);
+        .child(groups);
     let card = match status {
         Some(words) => card.child(words),
         None => card,
