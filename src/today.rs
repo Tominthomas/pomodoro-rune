@@ -6,20 +6,22 @@
 
 use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
-use rune::{El, Key, KeyEvent, TextEdit, Tx, canvas, col, el, row, text, text_input};
+use rune::{El, Key, KeyEvent, ScrollSpec, TextEdit, Tx, canvas, col, el, row, text, text_input};
 
 use crate::drawing::ring;
 use crate::history;
 use crate::lantern::{self, Lantern, Pose};
 use crate::log::{Block, Calendar, Day, Felt, Log, Totals, duration};
-use crate::readout::{HIT, button};
+use crate::readout::{HIT, button, mmss};
 use crate::theme::{H, Ink, Place, W, rgb};
-use crate::{Page, State, describe_block, guarded, open_today, put_explanation_away};
+use crate::timer::{Clock, Event, Phase, Timer};
+use crate::{Page, State, carry, describe_block, guarded, open_today, put_explanation_away};
 
 const PAD: f32 = 22.0;
 pub const WIDE: f32 = W - 2.0 * PAD;
-/// Lanterns on the strip keep at least this far apart, however close their blocks ended.
-const SPREAD: f32 = 20.0;
+/// Lanterns on the strip keep at least this far apart, however close their blocks ended: wider
+/// than a target, so no two targets overlap.
+const SPREAD: f32 = HIT + 2.0;
 pub const DAYS: [&str; 7] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 pub const MONTHS: [&str; 12] = [
     "January",
@@ -39,6 +41,8 @@ pub const MONTHS: [&str; 12] = [
 const LANTERN: &str = "a lantern is a block finished";
 const RING: &str = "a ring is the minutes kept after letting go";
 const KNOT: &str = "a knot is a pause";
+/// The strip's viewport, which a crowded day scrolls sideways.
+pub const STRIP: &str = "day-strip-view";
 
 /// What Today and History read from: the log, and which day on the user's calendar.
 pub struct Ledger<'a> {
@@ -55,8 +59,11 @@ pub struct Ledger<'a> {
     pub rename: &'a TextEdit,
     /// Whether the card explaining lanterns, rings and knots still shows.
     pub explain: bool,
-    /// What the last bell said, while it is news.
+    /// What the last bell said, until the next phase starts.
     pub status: Option<El>,
+    /// The timer as it stands, and the window's clock to read it at.
+    pub timer: &'a Timer,
+    pub clock: f64,
 }
 
 /// Where Today is: the day it shows, the History tile under the pointer, and the block open.
@@ -161,7 +168,66 @@ impl Ledger<'_> {
     }
 }
 
-/// The view's content, drawn on the place's evening behind it.
+/// The timer as it stands, held at the top of Today so time passing, or a pause, is never out of
+/// sight: the phase and its time, the one press it takes now, and the bell's words until the next
+/// start. A let go can still be taken back from here.
+fn now_bar(l: &Ledger<'_>) -> El {
+    let k = l.ink();
+    let t = l.timer;
+    let time = mmss(t.shown(l.clock));
+    let (words, press) = match (&t.clock, t.phase) {
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => {
+            (format!("Focus ready · {time}"), Some("Start focus"))
+        }
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => {
+            (format!("Break ready · {time}"), Some("Start break"))
+        }
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => {
+            (format!("Long break ready · {time}"), Some("Start break"))
+        }
+        (Clock::Ticking { .. }, Phase::Focus) => (format!("Focus · {time} left"), Some("Pause")),
+        (Clock::Ticking { .. }, Phase::Short) => (format!("Break · {time} left"), Some("Pause")),
+        (Clock::Ticking { .. }, Phase::Long) => (format!("Long break · {time} left"), Some("Pause")),
+        (Clock::Paused { .. }, _) => (format!("Paused · {time} left"), Some("Resume")),
+        (Clock::Ringing { kept: true, .. }, Phase::Focus) => ("Focus complete".into(), None),
+        (Clock::Ringing { .. }, Phase::Focus) => ("Let go".into(), None),
+        (Clock::Ringing { .. }, _) => ("Break over".into(), None),
+    };
+    let mut said = col().gap(3.0).shrink().child(label(k, &words, 13.0, 560.0, 0.97).key("timer-text"));
+    if let Some(status) = l.status.clone() {
+        said = said.child(status.wrap());
+    }
+    let mut acts = row().gap(6.0).self_start();
+    if t.can_undo() {
+        acts = acts.child(
+            button(k, "timer-undo", "Undo let go", "Bring the block back  U")
+                .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx))),
+        );
+    }
+    if let Some(press) = press {
+        acts = acts.child(
+            button(k, "timer-press", press, &format!("{press}  Space"))
+                .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
+        );
+    }
+    row()
+        .key("timer-bar")
+        .w(WIDE)
+        .min_h(44.0)
+        .px(12.0)
+        .py(8.0)
+        .gap(10.0)
+        .center_y()
+        .justify_between()
+        .radius(14.0)
+        .fill(k.shade.alpha(0.42))
+        .border(1.0, k.text.alpha(0.16))
+        .child(said)
+        .child(acts)
+}
+
+/// The view's content, drawn on the place's evening behind it: the timer and the day's name held
+/// at the top, and under them the day and the four weeks, which scroll when they outgrow the window.
 pub fn view(l: &Ledger<'_>) -> El {
     let k = l.ink();
     let today = l.today();
@@ -180,7 +246,8 @@ pub fn view(l: &Ledger<'_>) -> El {
             .child(button(k, "back-to-today", "Today", "Back to today").on_press_tx(navigate(Nav::back_to_today)));
     }
     actions = actions.child(
-        button(k, "today-close", "Close", "Back to the sunset  Esc").on_press_tx(guarded(|s, _| open_today(s, false))),
+        button(k, "today-close", "Back to sunset", "Back to the sunset  Esc")
+            .on_press_tx(guarded(|s, tx| open_today(s, false, tx))),
     );
     let head = row()
         .w(WIDE)
@@ -192,11 +259,14 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &subtitle, 12.0, 450.0, 0.82).key("today-date")),
         )
         .child(actions.self_start());
-    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 2.0), Some(PAD - 4.0), None);
-    if let Some(status) = l.status.clone() {
-        page = page.child(status).child(el().h(6.0));
-    }
-    let mut page = page.child(head);
+    let page = col()
+        .key("today")
+        .pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0))
+        .child(now_bar(l))
+        .child(el().h(14.0))
+        .child(head)
+        .child(el().h(6.0));
+    let mut body = col().key("today-body").pb(PAD);
     let opened = l.nav.serial().and_then(|n| blocks.iter().find(|(m, _)| *m == n)).map(|(n, b)| (*n, *b));
     let under = match opened {
         Some((n, b)) => detail(l, n, b),
@@ -207,8 +277,8 @@ pub fn view(l: &Ledger<'_>) -> El {
         None if blocks.is_empty() => label(k, "No blocks this day.", 11.5, 450.0, 0.82).key("strip-note"),
         None => label(k, "pick a lantern or a ring for its details", 11.0, 450.0, 0.82).key("strip-note"),
     };
-    page = page.child(el().h(2.0)).child(strip(l, &blocks)).child(el().h(2.0)).child(under).child(el().h(10.0));
-    let mut numbers = row().gap(28.0).child(stat(k, "focused", &duration(totals.focused), "focused")).child(stat(
+    body = body.child(el().h(2.0)).child(strip(l, &blocks)).child(el().h(2.0)).child(under).child(el().h(10.0));
+    let mut numbers = row().gap(28.0).child(stat(k, "focused", &duration(totals.focused), "focus logged")).child(stat(
         k,
         "lanterns",
         &totals.lanterns.to_string(),
@@ -217,14 +287,14 @@ pub fn view(l: &Ledger<'_>) -> El {
     if totals.let_go() > 0 {
         numbers = numbers.child(stat(k, "let-go", &totals.let_go().to_string(), "let go"));
     }
-    page = page.child(numbers);
+    body = body.child(numbers);
     let labels = Log::labels(blocks.iter().map(|(_, b)| *b));
     if !labels.is_empty() {
-        page = page.child(el().h(10.0)).child(worked_on(k, &labels));
+        body = body.child(el().h(10.0)).child(worked_on(k, &labels));
     }
     if totals.lanterns > 0 {
         let said = format!("you said how {} of {} felt", totals.reflected(), totals.lanterns);
-        page = page.child(el().h(10.0)).child(
+        body = body.child(el().h(10.0)).child(
             row()
                 .gap(8.0)
                 .center_y()
@@ -232,10 +302,22 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &said, 11.0, 450.0, 0.82).key("reflected")),
         );
         if totals.reflected() > 0 {
-            page = page.child(el().h(6.0)).child(felt_bar(k, &totals));
+            body = body.child(el().h(6.0)).child(felt_bar(k, &totals));
         }
     }
-    page.child(el().h(12.0)).child(history::view(l, today))
+    body = body.child(el().h(12.0)).child(history::view(l, today));
+    // Below the held top, the day scrolls in what is left of the window, and a tile or a lantern
+    // reached by the keyboard scrolls into view.
+    page.child(
+        col()
+            .key("today-scroll")
+            .grow(1.0)
+            .min_h(0.0)
+            .scroll(ScrollSpec { stick_bottom: false })
+            .scroll_edge_fade(18.0)
+            .scroll_margin(12.0)
+            .child(body),
+    )
 }
 
 /// The marks explained under the strip the first times it shows them; put away for good with
@@ -397,8 +479,9 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
 }
 
 /// The day along a waterline, with each block where it ended: a lantern for one that ran to
-/// the bell, a ring for one let go. Blocks that ended close together are spread apart. On
-/// today, a labelled tick marks now.
+/// the bell, a ring for one let go. Blocks that ended close together are spread apart, and a day
+/// with more than the window holds runs on to the right, scrolled to its newest when Today
+/// opens. On today, a labelled tick marks now.
 fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
     let k = l.ink();
     let h = 58.0;
@@ -406,11 +489,17 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
     let hours = |b: &Block| l.cal.hour_of(b.ended);
     let from = blocks.iter().map(|(_, b)| hours(b).floor() - 1.0).fold(8.0f32, f32::min);
     let to = blocks.iter().map(|(_, b)| hours(b).ceil() + 1.0).fold(20.0f32, f32::max);
-    let x_of = |hr: f32| (hr - from) / (to - from) * WIDE;
+    let wide = WIDE.max(blocks.len() as f32 * SPREAD + 24.0);
+    let x_of = |hr: f32| (hr - from) / (to - from) * wide;
+    let mut xs: Vec<f32> = blocks.iter().map(|(_, b)| x_of(hours(b))).collect();
+    for i in 1..xs.len() {
+        xs[i] = xs[i].max(xs[i - 1] + SPREAD);
+    }
+    let wide = xs.last().map_or(wide, |x| wide.max(x + 14.0));
 
-    let mut sh = Shape::new().line([0.0, base], [WIDE, base], 1.0, LineCap::Butt, k.text.alpha(0.3));
-    let mut marks = el().w(WIDE).h(14.0);
-    let now = (l.day == l.today()).then(|| x_of(l.cal.hour_of(l.now))).filter(|x| (0.0..=WIDE).contains(x));
+    let mut sh = Shape::new().line([0.0, base], [wide, base], 1.0, LineCap::Butt, k.text.alpha(0.3));
+    let mut marks = el().w(wide).h(14.0);
+    let now = (l.day == l.today()).then(|| x_of(l.cal.hour_of(l.now))).filter(|x| (0.0..=wide).contains(x));
     for hr in (from.ceil() as i32..=to.floor() as i32).filter(|h| h % 3 == 0) {
         let x = x_of(hr as f32);
         sh = sh.line([x, base + 4.0], [x, base + 8.0], 1.0, LineCap::Butt, k.text.alpha(0.5));
@@ -430,16 +519,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
             .child(el().key("now").absolute(x - 30.0, 0.0).w(60.0).center().child(label(k, "now", 10.5, 600.0, 0.95)));
     }
 
-    let mut xs: Vec<f32> = blocks.iter().map(|(_, b)| x_of(hours(b))).collect();
-    for i in 1..xs.len() {
-        xs[i] = xs[i].max(xs[i - 1] + SPREAD);
-    }
-    if let Some(over) = xs.last().map(|x| x - (WIDE - 12.0)).filter(|o| *o > 0.0) {
-        for x in &mut xs {
-            *x -= over;
-        }
-    }
-    let mut art = el().key("day-strip").size(WIDE, h);
+    let mut art = el().key("day-strip").size(wide, h);
     let (mut lit, mut rings) = (0, 0);
     for (&(serial, b), x) in blocks.iter().zip(xs) {
         let x = x.round();
@@ -482,7 +562,9 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
             rings += 1;
         }
     }
-    col().gap(2.0).child(art.child(canvas(sh).absolute(0.0, 0.0).size(WIDE, h).inert())).child(marks)
+    el().key(STRIP).w(WIDE).scroll_x().child(
+        col().w(wide).gap(2.0).child(art.child(canvas(sh).absolute(0.0, 0.0).size(wide, h).inert())).child(marks),
+    )
 }
 
 fn stat(k: Ink, key: &str, n: &str, what: &str) -> El {

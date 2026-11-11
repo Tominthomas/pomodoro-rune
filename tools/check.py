@@ -31,9 +31,17 @@ FPS = {
     "drag": "60",
     "today": "60",
     "bell": "60",
+    "four-labels": "60",
+    "busy-day": "30",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
-SCENE = {"today": "today", "bell": "last-minute", "night": "night-minute"}
+SCENE = {
+    "today": "today",
+    "bell": "last-minute",
+    "night": "night-minute",
+    "four-labels": "today",
+    "busy-day": "busy",
+}
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
 # inherits. src/tests.rs holds the same floor.
@@ -117,13 +125,34 @@ def phase(t):
 
 
 def fits(t):
-    """Every visible text lies inside the window on all four sides, as drawn at its real size."""
+    """Every visible text lies inside the window on all four sides, as drawn at its real size. Today
+    below its held top scrolls, so there a text need only fit the width; the day's strip scrolls
+    sideways too, so its marks need not."""
     return all(
-        x >= -0.5 and y >= -0.5 and x + w <= 380.5 and y + h <= 540.5
+        x >= -0.5 and x + w <= 380.5 and ("/today-scroll/" in e["path"] or (y >= -0.5 and y + h <= 540.5))
         for e in t["@all"]
-        if e.get("text") and ink(e) > 0.05 and e.get("rect")
+        if e.get("text") and ink(e) > 0.05 and e.get("rect") and "/day-strip-view/" not in e["path"]
         for x, y, w, h in [e["rect"]]
     )
+
+
+def held(t):
+    """Today's timer, title and way back are where they belong whatever scrolls under them."""
+    return all(
+        t[k]["rect"][1] >= 0 and t[k]["rect"][1] + t[k]["rect"][3] <= 130
+        for k in ("timer-bar", "today-title", "today-close")
+    )
+
+
+def scrolls_to(t, key):
+    """The element keyed `key` is in the part of Today that scrolls."""
+    return "/today-scroll/" in t.get(key, {}).get("path", "")
+
+
+def apart(rects):
+    """No two of these boxes overlap side to side."""
+    rects = sorted(rects)
+    return all(a[0] + a[2] <= b[0] + 0.5 for a, b in pairwise(rects))
 
 
 def right_edge(t, key):
@@ -412,10 +441,33 @@ CHECKS = [
         ),
     ),
     (
-        "Today fits the window with a block open, History's legend included",
+        "Today holds its timer and title with a block open, and History's legend scrolls up under them",
         "today",
         "felt-given",
-        lambda t: fits(t) and t["history-scale"]["rect"][1] + t["history-scale"]["rect"][3] <= 540,
+        lambda t: fits(t) and held(t) and scrolls_to(t, "history-scale"),
+    ),
+    (
+        "four long names keep inside the width, and the page still scrolls to the legend",
+        "four-labels",
+        "view",
+        lambda t: (
+            fits(t)
+            and held(t)
+            and "for-name-Calculus practice problems" in t
+            and scrolls_to(t, "history-scale")
+            and t["today-scroll"]["rect"][1] + t["today-scroll"]["rect"][3] <= 540.5
+        ),
+    ),
+    (
+        "a day of nineteen blocks keeps every mark's target apart, opening on the newest",
+        "busy-day",
+        "open",
+        lambda t: (
+            len(lanterns(t, "day-lantern-")) + len(lanterns(t, "day-ring-")) == 19
+            and apart([t[k]["rect"] for k in lanterns(t, "day-lantern-") + lanterns(t, "day-ring-")])
+            and t["day-lantern-14"]["rect"][0] + 24 <= t["day-strip-view"]["rect"][0] + t["day-strip-view"]["rect"][2]
+            and t["day-lantern-14"]["rect"][0] >= t["day-strip-view"]["rect"][0]
+        ),
     ),
     ("and with a day's explanation showing", "cycle", "today", lambda t: fits(t) and "explain" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),

@@ -67,6 +67,15 @@ impl App {
         App { rt, disk: disk.clone() }
     }
 
+    /// Opens the window on one of the review scenes, as `--scene` does.
+    fn scene(name: &str) -> App {
+        let mut app = App::new();
+        let (_, setup) = demo::SCENES.iter().find(|(n, _)| *n == name).unwrap_or_else(|| panic!("{name} is a scene"));
+        app.rt.update(|s, _| setup(s));
+        app.look();
+        app
+    }
+
     /// Quits, waiting for the last save, and opens the app again `later` seconds on.
     fn relaunch(&self, later: f64) -> App {
         assert_eq!(self.rt.state.store.flush(Duration::from_secs(5)), Ok(()), "the last save is written");
@@ -187,6 +196,24 @@ impl App {
         let tree = self.rt.accessibility_tree();
         let (_, n) = tree.nodes.iter().find(|(_, n)| n.author_id() == Some("status"))?;
         Some((n.label().unwrap_or_default().to_string(), n.live() == Some(rune::accesskit::Live::Polite)))
+    }
+
+    /// The element holding keyboard focus: its key, and where it is drawn.
+    fn focused(&self) -> Option<(String, [f32; 4])> {
+        self.rt.elements().into_iter().find(|e| e.focused).map(|e| (e.key.unwrap_or_default(), e.rect))
+    }
+
+    /// Presses Tab until focus lands on an element whose key is `wanted`, and says where it is
+    /// drawn once the window is still.
+    fn tab_to(&mut self, wanted: impl Fn(&str) -> bool) -> [f32; 4] {
+        for _ in 0..80 {
+            if self.focused().is_some_and(|(k, _)| wanted(&k)) {
+                self.look();
+                return self.focused().map(|(_, rect)| rect).unwrap_or_default();
+            }
+            self.key(Key::Tab);
+        }
+        panic!("Tab never reaches it");
     }
 
     /// The lanterns floating on the water.
@@ -564,4 +591,98 @@ fn each_bell_is_announced_once_politely_whatever_page_is_open() {
     assert_eq!(app.status(), None, "the break has started");
     app.rt.frame(5.0 * 60.0);
     assert_eq!(app.status(), Some(("Break complete. Focus ready.".into(), true)));
+}
+
+/// Whether `rect` is wholly inside `within`.
+fn inside(rect: [f32; 4], within: [f32; 4]) -> bool {
+    let [x, y, w, h] = rect;
+    let [a, b, c, d] = within;
+    x >= a - 0.5 && y >= b - 0.5 && x + w <= a + c + 0.5 && y + h <= b + d + 0.5
+}
+
+#[test]
+fn a_long_day_keeps_every_lantern_apart_and_reachable_from_the_keyboard() {
+    let mut app = App::scene("busy");
+    app.key(Key::Escape);
+    app.char("h");
+    app.look();
+    let targets: Vec<[f32; 4]> = app
+        .rt
+        .elements()
+        .into_iter()
+        .filter(|e| e.key.as_deref().is_some_and(|k| k.starts_with("day-lantern-") || k.starts_with("day-ring-")))
+        .filter(|e| !e.key.as_deref().is_some_and(|k| k.contains("art")))
+        .map(|e| e.rect)
+        .collect();
+    assert_eq!(targets.len(), 19);
+    for (i, a) in targets.iter().enumerate() {
+        for b in &targets[i + 1..] {
+            assert!(a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0], "targets overlap: {a:?} {b:?}");
+        }
+    }
+    let view = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(today::STRIP)).unwrap().rect;
+    let newest = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("day-lantern-14")).unwrap().rect;
+    assert!(inside(newest, view), "Today opens on the newest: {newest:?} in {view:?}");
+    for key in ["day-lantern-0", "day-ring-3", "day-lantern-14"] {
+        let at = app.tab_to(|k| k == key);
+        assert!(inside(at, view), "{key} scrolls into view: {at:?} in {view:?}");
+    }
+}
+
+#[test]
+fn four_long_names_push_history_down_and_the_page_scrolls_to_it() {
+    let mut app = App::scene("today");
+    let names =
+        ["Draft literature review", "Calculus practice problems", "Read research paper", "Write seminar summary"];
+    for (i, name) in names.iter().enumerate() {
+        app.tap(&format!("day-lantern-{i}"));
+        app.tap("detail-rename");
+        app.key(Key::Command('a'));
+        app.typed(name);
+        app.key(Key::Enter);
+        app.look();
+    }
+    let window = [0.0, 0.0, W, H];
+    for key in ["timer-bar", "today-title", "today-close"] {
+        let at = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).unwrap().rect;
+        assert!(inside(at, window), "{key} stays put: {at:?}");
+    }
+    app.tab_to(|k| k.strip_prefix("day-").is_some_and(|n| n.parse::<i64>().is_ok()));
+    app.key(Key::End);
+    app.look();
+    let today = format!("day-{}", UTC.day_of(HEADLESS_EPOCH as i64).0);
+    let (key, at) = app.focused().unwrap();
+    assert_eq!(key, today, "End reaches the last day in the grid");
+    assert!(inside(at, window), "and today's tile scrolls into view: {at:?}");
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
+    let legend = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("history-scale")).unwrap().rect;
+    assert!(inside(legend, window), "and the wheel reaches the legend: {legend:?}");
+}
+
+#[test]
+fn today_keeps_the_running_block_in_sight_and_in_hand() {
+    let mut app = App::new();
+    app.space();
+    app.wait(4.0);
+    app.char("h");
+    app.look();
+    let bar = |app: &App| app.read("timer-text").unwrap_or_default();
+    assert_eq!(bar(&app), "Focus · 24:56 left", "the block runs on in sight");
+    app.tap("timer-press");
+    app.look();
+    assert!(bar(&app).starts_with("Paused · 24:5"), "paused from Today: {}", bar(&app));
+    app.wait(10.0);
+    app.space();
+    app.look();
+    assert!(bar(&app).starts_with("Focus · 24:5"), "and Space there resumes it where you can see: {}", bar(&app));
+    app.char("s");
+    app.wait(RING + 0.5);
+    assert_eq!(bar(&app), "Break ready · 05:00");
+    app.tap("timer-undo");
+    app.look();
+    assert!(bar(&app).starts_with("Focus · 24:"), "a let go comes back from Today: {}", bar(&app));
+    app.tap("today-close");
+    app.look();
+    assert_eq!(app.phase(), "focus", "and Back to sunset finds it still running");
 }

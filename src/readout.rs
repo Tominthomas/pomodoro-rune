@@ -72,7 +72,7 @@ pub fn scrim(k: Ink) -> El {
     )
 }
 
-fn mmss(secs: u32) -> String {
+pub fn mmss(secs: u32) -> String {
     format!("{:02}:{:02}", secs / 60, secs % 60)
 }
 

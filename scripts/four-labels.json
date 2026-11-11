@@ -1,0 +1,113 @@
+{
+ "events": [
+  {
+   "t": 0.4,
+   "type": "tap",
+   "key": "day-lantern-0"
+  },
+  {
+   "t": 0.8,
+   "type": "tap",
+   "key": "detail-rename"
+  },
+  {
+   "t": 1.2,
+   "type": "key",
+   "name": "a",
+   "cmd": true
+  },
+  {
+   "t": 1.6,
+   "type": "type",
+   "text": "Draft literature review"
+  },
+  {
+   "t": 3.6,
+   "type": "key",
+   "name": "Enter"
+  },
+  {
+   "t": 4.4,
+   "type": "tap",
+   "key": "day-lantern-1"
+  },
+  {
+   "t": 4.8,
+   "type": "tap",
+   "key": "detail-rename"
+  },
+  {
+   "t": 5.2,
+   "type": "key",
+   "name": "a",
+   "cmd": true
+  },
+  {
+   "t": 5.6,
+   "type": "type",
+   "text": "Calculus practice problems"
+  },
+  {
+   "t": 7.6,
+   "type": "key",
+   "name": "Enter"
+  },
+  {
+   "t": 8.4,
+   "type": "tap",
+   "key": "day-lantern-2"
+  },
+  {
+   "t": 8.8,
+   "type": "tap",
+   "key": "detail-rename"
+  },
+  {
+   "t": 9.2,
+   "type": "key",
+   "name": "a",
+   "cmd": true
+  },
+  {
+   "t": 9.6,
+   "type": "type",
+   "text": "Read research paper"
+  },
+  {
+   "t": 11.6,
+   "type": "key",
+   "name": "Enter"
+  },
+  {
+   "t": 12.4,
+   "type": "tap",
+   "key": "day-lantern-3"
+  },
+  {
+   "t": 12.8,
+   "type": "tap",
+   "key": "detail-rename"
+  },
+  {
+   "t": 13.2,
+   "type": "key",
+   "name": "a",
+   "cmd": true
+  },
+  {
+   "t": 13.6,
+   "type": "type",
+   "text": "Write seminar summary"
+  },
+  {
+   "t": 15.6,
+   "type": "key",
+   "name": "Enter"
+  },
+  {
+   "t": 16.8,
+   "type": "mark",
+   "name": "view"
+  }
+ ]
+}

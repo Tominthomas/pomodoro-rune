@@ -222,6 +222,23 @@ SCRIPTS = {
         key(171.0, "h"),
         mark(172.0, "today"),
     ],
+    # Four ordinary, longer names given to the day's blocks from Today, one after another.
+    "four-labels": [
+        e
+        for i, name in enumerate(
+            ["Draft literature review", "Calculus practice problems", "Read research paper", "Write seminar summary"]
+        )
+        for e in [
+            {"t": 0.4 + 4 * i, "type": "tap", "key": f"day-lantern-{i}"},
+            {"t": 0.8 + 4 * i, "type": "tap", "key": "detail-rename"},
+            {"t": 1.2 + 4 * i, "type": "key", "name": "a", "cmd": True},
+            {"t": 1.6 + 4 * i, "type": "type", "text": name},
+            key(3.6 + 4 * i, "Enter"),
+        ]
+    ]
+    + [mark(16.8, "view")],
+    # A day of nineteen blocks, opened as a person opens Today.
+    "busy-day": [key(0.3, "Escape"), key(0.6, "h"), mark(1.6, "open")],
     # Every key on one card.
     "keys": [key(0.2, "?"), mark(1.0, "open")],
     # A label longer than the window has room for.

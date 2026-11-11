@@ -144,6 +144,9 @@ fn tile(l: &Ledger<'_>, day: Day, today: Day) -> El {
             if let Some(n) = nav(s) {
                 n.pick_day(day, today);
             }
+            // Arrows press the tile they reach, and the day it opens would otherwise keep the
+            // grid where it was.
+            tx.scroll_into_view(format!("day-{}", day.0));
         }))
         .child(canvas(sh).size(tw, th));
     match (shown, day == today) {

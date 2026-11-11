@@ -493,8 +493,12 @@ fn finish_label(s: &mut State, keep: bool, tx: &mut Tx) {
     tx.blur();
 }
 
-fn open_today(s: &mut State, open: bool) {
+/// Opens Today on today, its strip scrolled to the newest block, or goes back to the sunset.
+fn open_today(s: &mut State, open: bool, tx: &mut Tx) {
     s.page = if open { Page::Today(today::Nav::default()) } else { Page::Scene };
+    if open {
+        tx.scroll_to_x(today::STRIP, f32::MAX);
+    }
 }
 
 fn put_explanation_away(s: &mut State) {
@@ -503,12 +507,12 @@ fn put_explanation_away(s: &mut State) {
 }
 
 /// Escape closes whatever is open, innermost first.
-fn escape(s: &mut State) -> bool {
+fn escape(s: &mut State, tx: &mut Tx) -> bool {
     if s.keys_open {
         s.keys_open = false;
     } else if let Page::Today(nav) = &mut s.page {
         if !nav.escape() {
-            open_today(s, false);
+            open_today(s, false, tx);
         }
     } else if s.asking() != Asking::Hidden {
         s.reflect = None;
@@ -523,7 +527,7 @@ fn escape(s: &mut State) -> bool {
 fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
     let now = tx.clock();
     if e.key == Key::Escape {
-        return escape(s);
+        return escape(s, tx);
     }
     if e.is_command('z') {
         carry(s, Event::Undo { now }, tx);
@@ -543,7 +547,7 @@ fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
             "s" => Event::Skip { now },
             "u" => Event::Undo { now },
             "h" => {
-                open_today(s, matches!(s.page, Page::Scene));
+                open_today(s, matches!(s.page, Page::Scene), tx);
                 return true;
             }
             "t" => {
@@ -669,6 +673,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 explain: s.explain,
                 status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
                     .filter(|_| !s.keys_open),
+                timer: &s.timer,
+                clock: s.now,
             };
             // The page sits on the place's own sky: a golden afternoon in light mode, blue hour in dark.
             let sky = if dark { Sky::BlueHour { progress: 0.4 } } else { Sky::Sunset { progress: 0.6, dawn: None } };

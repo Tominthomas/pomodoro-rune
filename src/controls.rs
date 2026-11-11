@@ -142,7 +142,7 @@ pub fn view(s: &State, k: Ink) -> El {
         .child(play.on_press_tx(press))
         .child(
             docked(k, "control-today", "Today", "H", 14.0, shown, tab(k, "Today"))
-                .on_press_tx(act(|s, _| open_today(s, true))),
+                .on_press_tx(act(|s, tx| open_today(s, true, tx))),
         )
         .child(
             docked(
