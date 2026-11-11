@@ -1,0 +1,118 @@
+# Pomodoro
+
+[![CI](https://github.com/Tominthomas/pomodoro-rune/actions/workflows/ci.yml/badge.svg)](https://github.com/Tominthomas/pomodoro-rune/actions/workflows/ci.yml)
+
+<img src="assets/readme/sunset.png" alt="Three moments of one focus block: a high afternoon sun at 22:00, the sun low and orange at 04:00, and the sun touching the sea with a lantern lit on the water when the block ends">
+
+A pomodoro timer for macOS where each focus block is a sunset. The gap between the sun and the sea is the time you have left. When the sun touches the water, a paper lantern lights, and four lanterns earn you a long break.
+
+I built it in [Rune](https://github.com/anomalyco/rune), a Rust UI framework that draws everything on the GPU.
+
+Built by [Tomin Thomas](https://github.com/Tominthomas).
+
+## Run it
+
+The app runs on macOS. I've run it on an Apple silicon Mac with macOS 26.2.
+
+Install the Xcode Command Line Tools if you don't have them:
+
+```sh
+xcode-select --install
+```
+
+Install Rust with rustup, then load it into your current shell:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+. "$HOME/.cargo/env"
+```
+
+Then clone the repo and run it:
+
+```sh
+git clone https://github.com/Tominthomas/pomodoro-rune
+cd pomodoro-rune
+cargo run --release
+```
+
+`rust-toolchain.toml` pins the Rust version, so rustup installs the right one on the first build.
+
+## How a block goes
+
+A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space or click the sky to start. The sun sinks as the minutes run out.
+
+When the sun reaches the sea, ripples spread across the water and a lantern lights. The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
+
+A five-minute break waits next. Press Space or click the sky to start it. After the fourth lantern, the break is fifteen minutes, and the lanterns rise into the night. When the break ends, dawn opens the next block, which waits for you to start it.
+
+<p align="center">
+  <img src="assets/readme/bell.gif" width="380" alt="The last seconds of a block: the sun meets the sea, ripples spread across the water, and a lantern lights where the sun went down">
+  <img src="assets/readme/night.gif" width="380" alt="A long break: four lanterns lift off the water and drift up among the stars as the moon rises">
+</p>
+
+<p align="center">Left: the end of a focus block. Right: a one-minute demo break played at 3x speed. Normal long breaks default to fifteen minutes.</p>
+
+Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you stop early ("let go"), the minutes you kept show as a ring instead of a lantern, and you can undo it for nine seconds.
+
+## Keys
+
+Press `?` in the app to see these. The controls also appear in the bottom right when you move the pointer.
+
+| Key | What it does |
+| --- | --- |
+| `Space` | Start, pause, or resume |
+| `↑` `↓` | One minute longer or shorter, while the timer waits (`→` and `←` work too) |
+| `S` | Let go of a block, or skip a break |
+| `U` or `⌘Z` | Undo a let go, for nine seconds |
+| `L` | Name the next block |
+| `1` `2` `3` | How the block felt: deep, steady, or drifting |
+| `H` | Today and the last four weeks |
+| `T` | The next place |
+| `Tab` | Show the controls |
+| `?` | All the keys |
+| `Esc` | Close whatever is open |
+
+## Three places
+
+The same sunset over Coast, Lake, and Mesa. Press `T` to switch. The app follows your system's light or dark appearance. Dark mode is a later evening.
+
+<img src="assets/readme/places.png" alt="The three places late in a block. Top row in light mode: Coast with low hills over the sea, Lake with pine trees and mountains reflected in still water, Mesa with red rock buttes. Bottom row: the same three in dark mode, deeper colors with stars">
+
+## Today and the study log
+
+Press `H` for Today. It shows today's lanterns on a timeline, the time you focused, what you worked on, how the blocks felt, and a grid of the last four weeks. A study day starts at 4 a.m., so a late night counts toward the evening it began in.
+
+<img src="assets/readme/today.png" alt="The Today page in light and dark mode: a timeline of the day's lanterns, 1 h 49 min focused, 4 lanterns lit, time per label, a bar of how the blocks felt, and a four-week grid">
+
+Labels and feelings are optional. If you don't answer how a block felt, the question fades 30 seconds into the break.
+
+Your data stays on your Mac. The app saves your blocks, settings, and current cycle in one JSON file:
+
+```
+~/Library/Application Support/dev.tomin.pomodoro/prefs.json
+```
+
+It keeps each block for 120 days. After that, it keeps only each day's totals. To start over, quit the app and delete the file.
+
+## How it's built and checked
+
+The whole app is Rune: the sky, the water, the lanterns, and the text are all drawn by the app on the GPU, with no web view. The timer is a state machine in `src/timer.rs`, and the window only redraws while something on screen moves.
+
+Rune can render an app without a window, to a PNG or a video. I used that to check the app the way a person sees it. The scripts in `scripts/` replay input headless, and `tools/check.py` asserts what's on screen and what VoiceOver would read. To render any moment yourself:
+
+```sh
+cargo build --release
+target/release/pomodoro --list-scenes
+target/release/pomodoro --scene bell --theme dark --snap bell.png --at 2
+```
+
+The Rust tests in `src/tests.rs` drive the same view and key handlers through Rune's `Runtime`, which needs no GPU. They press keys, click the sky, run blocks to their end, and relaunch from what was saved, and they fail if the time or the phase line is drawn too faint to read.
+
+`tools/ci.sh` runs every check in order: `cargo fmt`, `clippy`, the Rust tests, `ruff`, a check that `scripts/` matches `tools/scripts.py`, and the headless checks. The headless checks need a Mac with a Metal GPU, `ffmpeg`, and `numpy`. GitHub Actions runs everything except the headless checks, because its macOS runners haven't been shown to render the app. `tools/readme-media.sh` regenerates the images on this page.
+
+## Credits
+
+- [Rune](https://github.com/anomalyco/rune) by Anomaly, MIT license.
+- [Inter](https://github.com/rsms/inter) by The Inter Project Authors, under the SIL Open Font License 1.1. The license is in `assets/fonts/Inter-OFL.txt`.
+
+The app is MIT licensed. See `LICENSE`.
