@@ -58,12 +58,14 @@ def run(script, at, out_flag, out, extra=()):
 
 
 def tree(script, at):
-    """The keyed elements at a mark, and under "@a11y" the accessibility nodes by key."""
+    """The keyed elements at a mark; under "@all" every element, keyed or not; and under "@a11y"
+    the accessibility nodes by key."""
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "tree.json"
         run(script, at, "--tree", out, ["--fps", FPS.get(script, "10"), "--scale", "1"])
         dump = json.loads(out.read_text())
         t = {e["key"]: e for e in dump["elements"] if e.get("key")}
+        t["@all"] = dump["elements"]
         t["@a11y"] = {}
         stack = [dump["accessibility"]]
         while stack:
@@ -118,8 +120,8 @@ def fits(t):
     """Every visible text lies inside the window on all four sides, as drawn at its real size."""
     return all(
         x >= -0.5 and y >= -0.5 and x + w <= 380.5 and y + h <= 540.5
-        for k, e in t.items()
-        if k != "@a11y" and e.get("text") and ink(e) > 0.05 and e.get("rect")
+        for e in t["@all"]
+        if e.get("text") and ink(e) > 0.05 and e.get("rect")
         for x, y, w, h in [e["rect"]]
     )
 
