@@ -159,7 +159,7 @@ CHECKS = [
         "VoiceOver reads the time left, not just its name",
         "start",
         "running",
-        lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time left",
+        lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time remaining",
     ),
     (
         "the hover controls show while the pointer moves",
@@ -188,7 +188,12 @@ CHECKS = [
         "the bell lights a lantern for the block",
         "cycle",
         "b1-bell",
-        lambda t: phase(t) == "a lantern for that one" and text(t, "time") == "1 min" and lanterns(t) == ["lantern-0"],
+        lambda t: (
+            phase(t) == "a lantern for that one"
+            and (text(t, "time"), text(t, "time-unit")) == ("1 min", "focused")
+            and (t["@a11y"]["time"].get("name"), spoken(t, "time")) == ("Block complete", "1 minute focused")
+            and lanterns(t) == ["lantern-0"]
+        ),
     ),
     (
         "then a short break waits, offering three words",
@@ -320,7 +325,11 @@ CHECKS = [
         "a block let go can be undone for a moment",
         "undo",
         "letgo",
-        lambda t: "undo" in t and phase(t) == "let go; the minutes still count",
+        lambda t: (
+            "undo" in t
+            and phase(t) == "let go; the minutes still count"
+            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "kept")
+        ),
     ),
     (
         "undo puts the block back, running",

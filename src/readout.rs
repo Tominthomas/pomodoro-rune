@@ -86,6 +86,14 @@ pub fn spoken(secs: u32) -> String {
     }
 }
 
+/// A length of time as `VoiceOver` reads it, rounded as `log::duration` shows it.
+fn spoken_minutes(secs: u32) -> String {
+    match (secs + 30) / 60 {
+        0 => "under a minute".into(),
+        m => spoken(m * 60),
+    }
+}
+
 /// The line under the time: what the scene is doing, and what to do next.
 pub fn phase_line(s: &State) -> &'static str {
     let t = &s.timer;
@@ -249,20 +257,24 @@ fn label(s: &State, k: Ink) -> El {
 /// minute either way. Pressed, it opens Today; under the pointer it says so.
 fn time_row(s: &State, k: Ink) -> El {
     let t = &s.timer;
-    let shown = match (&t.clock, s.study.log.blocks.last()) {
-        (Clock::Ringing { .. }, Some(b)) if t.phase == Phase::Focus => log::duration(b.focused),
-        (Clock::Scrubbing { .. }, _) => format!("{} min", t.length() / 60),
-        _ => mmss(t.shown(s.now)),
+    // A block that just ended shows what it came to, not the time left, and says which.
+    let (shown, unit, name, said) = match (&t.clock, s.study.log.blocks.last()) {
+        (Clock::Ringing { kept, .. }, Some(b)) if t.phase == Phase::Focus => {
+            let (unit, name) = if *kept { ("focused", "Block complete") } else { ("kept", "Block let go") };
+            (log::duration(b.focused), Some(unit), name, format!("{} {unit}", spoken_minutes(b.focused)))
+        }
+        (Clock::Scrubbing { .. }, _) => (format!("{} min", t.length() / 60), None, "Length", spoken(t.length())),
+        _ => (mmss(t.shown(s.now)), None, "Time remaining", spoken(t.shown(s.now))),
     };
     let display =
         TextStyle { features: "'tnum' 1", variations: "'opsz' 32", tracking: -0.3, ..TextStyle::new(DISPLAY, 300.0) };
-    let time = text(shown)
-        .key("time")
-        .font(display)
-        .color(k.text.alpha(BRIGHT))
-        .role("timer")
-        .label("Time left")
-        .a11y_value(spoken(t.shown(s.now)));
+    let time =
+        text(shown).key("time").font(display).color(k.text.alpha(BRIGHT)).role("timer").label(name).a11y_value(said);
+    // One row in every state, so the digits keep their place and never fade in anew.
+    let mut time = row().gap(6.0).items_end().child(time);
+    if let Some(unit) = unit {
+        time = time.child(line(k, unit, LEAD, 480.0, QUIET).key("time-unit").pb(6.0).a11y_hidden());
+    }
     let today = row()
         .key("time-today")
         .hover_group()

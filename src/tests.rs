@@ -247,6 +247,9 @@ fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
     assert_eq!(app.time(), "01:00");
     app.run_to_bell();
     assert_eq!((app.time(), app.phase()), ("1 min".into(), "a lantern for that one".into()));
+    assert_eq!(app.read("time-unit").as_deref(), Some("focused"), "what the minute was, not what is left");
+    let time = app.node("time").unwrap();
+    assert_eq!((&time["name"], &time["value"]), (&"Block complete".into(), &"1 minute focused".into()));
     assert_eq!(app.lanterns(), 1);
     assert_eq!(app.read("reflect-question").as_deref(), Some("How did that block feel? Optional."));
     app.wait(RING + 0.5);
