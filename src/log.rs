@@ -115,35 +115,39 @@ impl Day {
     }
 }
 
-/// The user's wall clock. Headless runs pin it to UTC, so scripts and renders don't depend on
-/// where they run.
+/// The user's wall clock: how far east of UTC it is at any moment, daylight saving included.
+/// Headless runs pin it to UTC, so scripts and renders don't depend on where they run.
 #[derive(Clone, Copy, Debug)]
 pub struct Calendar {
-    pub fixed_offset: Option<i32>,
+    /// Seconds east of UTC at a Unix time.
+    offset: fn(i64) -> i32,
 }
 
 impl Calendar {
+    pub const UTC: Calendar = Calendar { offset: |_| 0 };
+    /// The time zone the OS is set to.
+    pub const LOCAL: Calendar = Calendar { offset: |unix| LocalTime::at(unix * 1000).offset };
+
     pub fn local(self, unix: i64) -> LocalTime {
-        match self.fixed_offset {
-            Some(offset) => LocalTime::at_offset(unix * 1000, offset),
-            None => LocalTime::at(unix * 1000),
-        }
+        LocalTime::at_offset(unix * 1000, (self.offset)(unix))
     }
 
     pub fn day_of(self, unix: i64) -> Day {
-        let local = unix + i64::from(self.local(unix).offset);
+        let local = unix + i64::from((self.offset)(unix));
         Day((local - DAY_STARTS).div_euclid(86_400))
     }
 
-    /// Unix seconds when the next study day begins, at the next 4 a.m. after `unix`.
+    /// Unix seconds when the next study day begins, at the next 4 a.m. after `unix`. The offset
+    /// is the one in force at that 4 a.m., so a night the clocks change still turns at 4.
     pub fn next_day(self, unix: i64) -> i64 {
-        let offset = i64::from(self.local(unix).offset);
-        (self.day_of(unix).0 + 1) * 86_400 + DAY_STARTS - offset
+        let four = (self.day_of(unix).0 + 1) * 86_400 + DAY_STARTS;
+        let near = four - i64::from((self.offset)(unix));
+        four - i64::from((self.offset)(near))
     }
 
     /// Hours since local midnight of the study day `unix` falls in, so 1 a.m. reads as 25.
     pub fn hour_of(self, unix: i64) -> f32 {
-        let local = unix + i64::from(self.local(unix).offset);
+        let local = unix + i64::from((self.offset)(unix));
         (local - self.day_of(unix).0 * 86_400) as f32 / 3600.0
     }
 }
@@ -370,7 +374,7 @@ pub fn duration(secs: u32) -> String {
 mod tests {
     use super::*;
 
-    const UTC: Calendar = Calendar { fixed_offset: Some(0) };
+    const UTC: Calendar = Calendar::UTC;
     /// 2026-11-11 00:00 UTC, a Wednesday.
     const WED: i64 = 1_794_355_200;
     const H: i64 = 3600;
@@ -423,6 +427,27 @@ mod tests {
         assert_eq!(UTC.next_day(WED + 28 * H), WED + 52 * H);
         let date = UTC.day_of(WED + 2 * H).date();
         assert_eq!((date.month, date.day), (11, 10));
+    }
+
+    /// New York in 2027: daylight saving from 2 a.m. on 14 March to 2 a.m. on 7 November.
+    const NEW_YORK: Calendar =
+        Calendar { offset: |unix| if (1_805_007_600..1_825_567_200).contains(&unix) { -4 * 3600 } else { -5 * 3600 } };
+
+    #[test]
+    fn the_day_still_turns_at_four_on_the_nights_the_clocks_change() {
+        let spring_eve = 1_804_964_400;
+        let spring_turn = 1_805_011_200;
+        assert_eq!(NEW_YORK.next_day(spring_eve), spring_turn, "2 p.m. EST on the 13th turns at 4 a.m. EDT");
+        assert_eq!(NEW_YORK.local(spring_turn).hour, 4);
+        let autumn_eve = 1_825_527_600;
+        let autumn_turn = 1_825_578_000;
+        assert_eq!(NEW_YORK.next_day(autumn_eve), autumn_turn, "3 p.m. EDT on the 6th turns at 4 a.m. EST");
+        assert_eq!(NEW_YORK.local(autumn_turn).hour, 4);
+        assert_ne!(
+            NEW_YORK.day_of(autumn_turn - 1),
+            NEW_YORK.day_of(autumn_turn),
+            "and the day is new from that second"
+        );
     }
 
     #[test]

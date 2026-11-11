@@ -154,7 +154,7 @@ fn init(handle: AppHandle<State>) -> State {
     } else {
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
     };
-    let cal = Calendar { fixed_offset: headless.then_some(0) };
+    let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
     restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()

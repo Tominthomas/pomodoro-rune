@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::*;
 
-const UTC: Calendar = Calendar { fixed_offset: Some(0) };
+const UTC: Calendar = Calendar::UTC;
 /// One frame at 60 fps: how long a key or a tap takes to land.
 const STEP: f64 = 1.0 / 60.0;
 /// Text a person must read is drawn at least this opaque, its colour's alpha times the opacity
