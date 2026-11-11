@@ -5,11 +5,11 @@
 
 use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
-use rune::{El, Key, KeyEvent, Transition, Tx, canvas, col, el, row, text, text_input};
+use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, canvas, col, el, row, text, text_input};
 
 use crate::log::{self, Felt};
 use crate::theme::{H, Ink, W};
-use crate::timer::{Clock, Event, Phase};
+use crate::timer::{Clock, Event, Phase, Timer};
 use crate::{Asking, State, carry, edit_label, finish_label, guarded, open_today, rate};
 
 /// Text on the scene: the main line, and the quieter ones under it. Both keep 4.5:1 on the
@@ -102,6 +102,33 @@ pub fn phase_line(s: &State) -> &'static str {
         (Phase::Long, Clock::Wound) => "long rest · space when you're ready",
         (Phase::Long, _) => "long rest, four lanterns up",
     }
+}
+
+/// What a bell says once it has rung: the phase it ended, and what waits now.
+pub fn rang(ended: Phase, t: &Timer) -> String {
+    match (ended, t.settled().0) {
+        (Phase::Focus, next @ (Phase::Short | Phase::Long)) => {
+            let kind = if next == Phase::Long { "long break" } else { "break" };
+            format!("Focus complete. {}-minute {kind} ready.", t.lengths.of(next) / 60)
+        }
+        _ => "Break complete. Focus ready.".into(),
+    }
+}
+
+/// The last bell's words, as a status assistive technology announces politely. `news` is true
+/// only for the first view to draw a bell, so it is announced once, whichever page is open, and
+/// a page or the key card drawing it later stays quiet.
+pub fn status(s: &State, k: Ink, news: bool) -> Option<El> {
+    let words = rang(s.rang?, &s.timer);
+    Some(
+        text(words.clone())
+            .key("status")
+            .role("status")
+            .label(words)
+            .live_region(if news { LiveRegion::Polite } else { LiveRegion::Off })
+            .font(TextStyle::new(SMALL, 540.0))
+            .color(k.text.alpha(BRIGHT)),
+    )
 }
 
 pub fn view(s: &State, k: Ink) -> El {

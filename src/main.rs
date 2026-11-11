@@ -142,6 +142,12 @@ pub struct State {
     store: Store,
     /// Why the last save failed or is slow, until one works again.
     save_error: Option<String>,
+    /// The phase whose bell rang last, until the next phase starts or the user moves on.
+    rang: Option<Phase>,
+    /// How many bells have rung, and how many of them a view has drawn as news: each is
+    /// announced once, as it happens, never again when the page or the key card changes.
+    bells: u32,
+    heard: Cell<u32>,
 }
 
 /// The first state, from what was saved. Headless runs keep their own settings and record in
@@ -224,6 +230,9 @@ impl State {
             reduced: Cell::new(false),
             store,
             save_error: None,
+            rang: None,
+            bells: 0,
+            heard: Cell::new(0),
         }
     }
 
@@ -351,7 +360,11 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
     for effect in s.timer.step(event) {
         match effect {
             Effect::WakeAt(at) => tx.wake_at(at),
-            Effect::Rang(phase) => notify(phase),
+            Effect::Rang(phase) => {
+                notify(phase);
+                s.rang = Some(phase);
+                s.bells += 1;
+            }
             Effect::Ended(ended) => {
                 let finished = ended.outcome == timer::Outcome::Finished;
                 let serial = s.study.record(ended, s.unix(), s.label());
@@ -371,6 +384,9 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
             }
             Effect::Advanced { .. } => {}
         }
+    }
+    if matches!(event, Event::Skip { .. } | Event::Undo { .. }) || matches!(s.timer.clock, Clock::Ticking { .. }) {
+        s.rang = None;
     }
     changed |= s.study.settle(&s.timer);
     if changed {
@@ -573,6 +589,7 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
+    let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     let (water, stars) = s.lanterns();
     // Reduce Motion: a bell or a dawn shows only where it ends.
@@ -614,7 +631,14 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .on_drag(drag)
                 .child(scene::view(&scene).key("scene").absolute(0.0, 0.0));
             let k = theme::Ink::on(scene::ground(&scene));
-            root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k))
+            // The phase line already says it on the scene, so here the status is only heard.
+            let status =
+                readout::status(s, k, news).filter(|_| !s.keys_open).map(|e| e.opacity(1.0).color(k.text.alpha(0.0)));
+            let root = root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k));
+            match status {
+                Some(e) => root.child(e.absolute(24.0, H - 184.0)),
+                None => root,
+            }
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
@@ -628,6 +652,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 nav,
                 rename: &s.rename,
                 explain: s.explain,
+                status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
+                    .filter(|_| !s.keys_open),
             };
             // The page sits on the place's own sky: a golden afternoon in light mode, blue hour in dark.
             let sky = if dark { Sky::BlueHour { progress: 0.4 } } else { Sky::Sunset { progress: 0.6, dawn: None } };
@@ -636,7 +662,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .child(today::view(&ledger).key("ledger").transition(Transition::blur_replace()))
         }
     };
-    if s.keys_open { page.child(controls::keys()) } else { page }
+    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news))) } else { page }
 }
 
 /// The window became the key window or stopped being it.

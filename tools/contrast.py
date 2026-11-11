@@ -80,9 +80,22 @@ def hover_offer(e):
     return e["text"] in HOVER_OFFERS or "/controls/" in e["path"]
 
 
+def unseen(e):
+    """Text drawn fully transparent, for assistive technology alone, such as the bell's status on
+    the scene, where the phase line already says it."""
+    color = e.get("color")
+    return isinstance(color, str) and len(color) == 9 and color.endswith("00")
+
+
 def texts(elements):
     for e in elements:
-        if e.get("text") and e.get("rect") and e["text"].strip() not in ("", "·") and not hover_offer(e):
+        if (
+            e.get("text")
+            and e.get("rect")
+            and e["text"].strip() not in ("", "·")
+            and not hover_offer(e)
+            and not unseen(e)
+        ):
             yield e
 
 

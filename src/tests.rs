@@ -182,6 +182,13 @@ impl App {
         None
     }
 
+    /// The status `VoiceOver` announces, and whether it is news: marked to be read out now.
+    fn status(&self) -> Option<(String, bool)> {
+        let tree = self.rt.accessibility_tree();
+        let (_, n) = tree.nodes.iter().find(|(_, n)| n.author_id() == Some("status"))?;
+        Some((n.label().unwrap_or_default().to_string(), n.live() == Some(rune::accesskit::Live::Polite)))
+    }
+
     /// The lanterns floating on the water.
     fn lanterns(&self) -> usize {
         (0..=timer::CYCLE).take_while(|i| self.has(&format!("lantern-{i}"))).count()
@@ -526,4 +533,33 @@ fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
     app.wait(1.0);
     assert_eq!(app.phase(), "paused · space to resume");
     assert_eq!(control(&app, "control-play"), "Resume");
+}
+
+#[test]
+fn each_bell_is_announced_once_politely_whatever_page_is_open() {
+    let done = "Focus complete. 5-minute break ready.".to_string();
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    app.wait(30.0);
+    assert_eq!(app.status(), None, "a running block's seconds are never announced");
+    app.char("h");
+    app.look();
+    app.rt.frame(31.0);
+    assert_eq!(app.status(), Some((done.clone(), true)), "the bell is news while Today is open");
+    app.settle();
+    assert_eq!(app.status(), Some((done.clone(), false)), "and said once");
+    assert_eq!(app.read("status"), Some(done.clone()), "Today shows it too");
+    app.char("?");
+    app.look();
+    assert_eq!(app.status(), Some((done.clone(), false)), "the key card shows it without saying it again");
+    app.key(Key::Escape);
+    app.key(Key::Escape);
+    app.look();
+    assert_eq!(app.status(), Some((done, false)), "back on the scene it is still quiet");
+    app.wait(RING);
+    app.space();
+    assert_eq!(app.status(), None, "the break has started");
+    app.rt.frame(5.0 * 60.0);
+    assert_eq!(app.status(), Some(("Break complete. Focus ready.".into(), true)));
 }

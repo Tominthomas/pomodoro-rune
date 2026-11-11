@@ -58,6 +58,8 @@ pub struct Ledger<'a> {
     pub rename: &'a TextEdit,
     /// Whether the card explaining lanterns, rings and knots still shows.
     pub explain: bool,
+    /// What the last bell said, while it is news.
+    pub status: Option<El>,
 }
 
 /// Where Today is: the day it shows, the History tile under the pointer, and the block open.
@@ -188,7 +190,11 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &subtitle, 12.0, 450.0, 0.82).key("today-date")),
         )
         .child(actions.self_start());
-    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 2.0), Some(PAD - 4.0), None).child(head);
+    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 2.0), Some(PAD - 4.0), None);
+    if let Some(status) = l.status.clone() {
+        page = page.child(status).child(el().h(6.0));
+    }
+    let mut page = page.child(head);
     let opened = l.nav.serial().and_then(|n| blocks.iter().find(|(m, _)| *m == n)).map(|(n, b)| (*n, *b));
     let under = match opened {
         Some((n, b)) => detail(l, n, b),

@@ -182,8 +182,8 @@ const KEYS: [(&str, &str); 12] = [
     ("Esc", "close"),
 ];
 
-/// Every key on one card, over a dimmed scene.
-pub fn keys() -> El {
+/// Every key on one card, over a dimmed scene, and under them the last bell's words.
+pub fn keys(status: Option<El>) -> El {
     // Each row wraps its description and grows, so nothing runs past the card.
     let rows = KEYS.iter().enumerate().fold(col().gap(8.0), |c, (i, (k, what))| {
         c.child(
@@ -215,6 +215,10 @@ pub fn keys() -> El {
             button(Ink::light(), "keys-close", "Close", "Close  Esc").on_press_tx(guarded(|s, _| s.keys_open = false)),
         ))
         .child(rows);
+    let card = match status {
+        Some(words) => card.child(words),
+        None => card,
+    };
     el().key("keys-veil")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .fill(rgb(0x05071a).alpha(0.5))
