@@ -146,8 +146,8 @@ SCRIPTS = {
         mark(4.0, "started"),
     ],
     # Today stays put under a stray click, and a lantern opens its block.
-    # A feeling is given later from the block's detail, and changed back; then History opens
-    # yesterday, and Today comes back.
+    # A feeling is given later from the block's detail, and changed back; then the page scrolls
+    # down to History, which opens yesterday, and Today comes back.
     "today": [
         {"t": 1.0, "type": "tap", "x": 200.0, "y": 40.0},
         mark(2.0, "clicked"),
@@ -159,6 +159,7 @@ SCRIPTS = {
         mark(5.8, "felt-given"),
         {"t": 6.0, "type": "tap", "key": "detail-felt-steady"},
         mark(6.8, "felt-cleared"),
+        {"t": 6.9, "type": "wheel", "x": 190.0, "y": 400.0, "dy": -2000.0},
         {"t": 7.0, "type": "tap", "key": f"day-{YESTERDAY}"},
         mark(8.0, "yesterday"),
         {"t": 8.5, "type": "tap", "key": "back-to-today"},

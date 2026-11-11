@@ -36,6 +36,8 @@ SCENES = {
 TARGET = 4.5
 # Text drawn less opaque than this is not in sight: its colour's alpha times the opacity it inherits.
 UNSEEN = 0.05
+# How far Today's scrolling edges fade, in points (src/today.rs).
+FADE = 18.0
 REQUIRED = ("time", "phase")
 
 
@@ -82,8 +84,20 @@ def ink(e):
     return alpha * (1.0 if opacity is None else opacity)
 
 
+def in_sight(e, view):
+    """Text in Today's scrolling part counts only where it is wholly in view, clear of the edges the
+    viewport fades to say there is more."""
+    if "/today-scroll/" not in e["path"]:
+        return True
+    _, y, _, h = e["rect"]
+    return y >= view[1] + FADE and y + h <= view[1] + view[3] - FADE
+
+
 def texts(elements):
+    view = next((e["rect"] for e in elements if e.get("key") == "today-scroll"), None)
     for e in elements:
+        if view and not in_sight(e, view):
+            continue
         if e.get("text") and e.get("rect") and e["text"].strip() not in ("", "·") and ink(e) >= UNSEEN:
             yield e
 

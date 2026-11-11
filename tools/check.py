@@ -320,7 +320,7 @@ CHECKS = [
         "cycle",
         "today",
         lambda t: (
-            text(t, "reflected") == "you said how 1 of 4 felt"
+            label(t, "felt-said") == "How the blocks felt: 1 deep, 3 not marked"
             and "felt-part-steady" not in t
             and "felt-part-drifting" not in t
         ),
@@ -357,7 +357,8 @@ CHECKS = [
         "reflect",
         "today",
         lambda t: (
-            text(t, "reflected") == "you said how 1 of 2 felt" and "feeling not given" in label(t, "day-lantern-1")
+            label(t, "felt-said") == "How the blocks felt: 1 steady, 1 not marked"
+            and "feeling not given" in label(t, "day-lantern-1")
         ),
     ),
     (
@@ -469,7 +470,7 @@ CHECKS = [
             and t["day-lantern-14"]["rect"][0] >= t["day-strip-view"]["rect"][0]
         ),
     ),
-    ("and with a day's explanation showing", "cycle", "today", lambda t: fits(t) and "explain" in t),
+    ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
     ("half a minute out, the sun's lower limb is still above the sea", "bell", "half", lambda t: sun_bottom(t) < 329.0),
     ("at 00:00 it touches the water", "bell", "zero", lambda t: abs(sun_bottom(t) - 330.0) < 0.6),
@@ -477,7 +478,7 @@ CHECKS = [
         "a click on Today's background leaves it open",
         "today",
         "clicked",
-        lambda t: text(t, "today-title") == "Today" and ("strip-note" in t or "explain" in t),
+        lambda t: text(t, "today-title") == "Today" and ("strip-note" in t or "strip-key" in t),
     ),
     (
         "a lantern in Today opens its block on two lines, clear of its close button",
@@ -541,7 +542,8 @@ if wanted("pixels"):
     paused = pixels("lantern-paused", "end", "day-lantern-art-0")
     same = int((plain != again).any(axis=1).sum())
     differ = int((plain != paused).any(axis=1).sum())
-    good = same == 0 and differ > 40
+    # One knot is a dot of 1.3 points, about 21 pixels at 2x; Today's page under it is still.
+    good = same == 0 and differ > 15
     failed += not good
     print(
         f"{'pass' if good else 'FAIL'}  a paused block's lantern looks different; the same lantern renders the same  "

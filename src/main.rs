@@ -111,8 +111,6 @@ pub struct State {
     reflect: Option<Reflect>,
     /// The first-use hint for setting a block's length, until it's been used or put away.
     hint: bool,
-    /// Today's card explaining lanterns, rings and knots, until it's put away.
-    explain: bool,
     page: Page,
     /// The key overlay `?` opens.
     keys_open: bool,
@@ -181,13 +179,12 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let lengths: Lengths = prefs.get("lengths").unwrap_or_default();
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
-    let explain = !prefs.get::<bool>("explained").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.explain, s.place) = (hint, explain, place);
+    (s.hint, s.place) = (hint, place);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -213,7 +210,6 @@ impl State {
             rename: TextEdit::new(String::new()),
             reflect: None,
             hint: false,
-            explain: false,
             page: Page::Scene,
             keys_open: false,
             place: 0,
@@ -501,11 +497,6 @@ fn open_today(s: &mut State, open: bool, tx: &mut Tx) {
     }
 }
 
-fn put_explanation_away(s: &mut State) {
-    s.explain = false;
-    s.store.set("explained", true);
-}
-
 /// Escape closes whatever is open, innermost first.
 fn escape(s: &mut State, tx: &mut Tx) -> bool {
     if s.keys_open {
@@ -670,16 +661,12 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 dark,
                 nav,
                 rename: &s.rename,
-                explain: s.explain,
                 status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
                     .filter(|_| !s.keys_open),
                 timer: &s.timer,
                 clock: s.now,
             };
-            // The page sits on the place's own sky: a golden afternoon in light mode, blue hour in dark.
-            let sky = if dark { Sky::BlueHour { progress: 0.4 } } else { Sky::Sunset { progress: 0.6, dawn: None } };
-            let evening = scene::view(&Scene { sky, water: &[], stars: &[], held: false, length: 25 * 60, ..scene });
-            root.child(today::backdrop(evening, Place::at(s.place), dark))
+            root.child(today::backdrop(Place::at(s.place), dark))
                 .child(today::view(&ledger).key("ledger").transition(Transition::blur_replace()))
         }
     };

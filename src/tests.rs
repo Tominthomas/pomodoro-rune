@@ -355,12 +355,16 @@ fn today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first() {
     app.look();
     assert!(!app.has("detail") && app.has("today-title"), "then the block");
     let yesterday = UTC.day_of(HEADLESS_EPOCH as i64).0 - 1;
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
     app.tap(&format!("day-{yesterday}"));
     app.look();
     assert_eq!(app.read("today-title").as_deref(), Some("Tuesday"));
     app.tap("back-to-today");
     app.look();
     assert_eq!(app.read("today-title").as_deref(), Some("Today"));
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
     app.tap(&format!("day-{yesterday}"));
     app.key(Key::Escape);
     app.look();
