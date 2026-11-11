@@ -9,7 +9,7 @@ step() { printf '\n==> %s\n' "$*"; }
 
 command -v ruff >/dev/null 2>&1 || ruff() { pipx run ruff "$@"; }
 
-# CI installs the pinned linters in .github/workflows/ci.yml. Locally, put them on PATH or in
+# CI installs the pinned tools in .github/workflows/ci.yml. Locally, put them on PATH or in
 # target/tools/bin. A missing one is skipped with a message, except in CI, where it fails.
 PATH="$PWD/target/tools/bin:$PATH"
 has() {
@@ -33,6 +33,14 @@ if has taplo; then
   toml=$(git ls-files '*.toml')
   RUST_LOG=warn taplo fmt --check $toml
   RUST_LOG=warn taplo check $toml
+fi
+if has cargo-machete; then
+  step "cargo machete"
+  cargo machete .
+fi
+if has cargo-deny; then
+  step "cargo deny"
+  cargo deny --locked check advisories licenses sources
 fi
 step "cargo clippy"
 cargo clippy --locked --all-targets --release -- -D warnings

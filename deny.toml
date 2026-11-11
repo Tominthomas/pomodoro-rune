@@ -1,0 +1,25 @@
+[graph]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+# Every license the macOS dependency graph needs, and no more. MPL-2.0 is Rune's audio decoder,
+# symphonia. It is copyleft per file, and the app does not change those files.
+allow = [
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Zlib",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+required-git-spec = "rev"
+allow-git = ["https://github.com/anomalyco/rune"]
