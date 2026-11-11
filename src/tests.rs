@@ -198,7 +198,7 @@ impl App {
 #[test]
 fn space_starts_pauses_and_resumes_the_sunset() {
     let mut app = App::new();
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · space to begin".into()));
+    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
     app.space();
     app.wait(2.0);
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
@@ -359,7 +359,7 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("sky");
     app.wait(1.0);
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · space to begin".into()));
+    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
     app.tap("sky");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus", "the next click does");
@@ -370,7 +370,7 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
 }
 
 #[test]
-fn the_activating_click_on_a_hover_control_does_nothing_either() {
+fn the_activating_click_on_a_control_does_nothing_either() {
     let mut app = App::new();
     app.rt.pointer_move(300.0, 510.0);
     app.rt.update(|s, tx| on_focus(s, false, tx));
@@ -378,7 +378,7 @@ fn the_activating_click_on_a_hover_control_does_nothing_either() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "focus · space to begin");
+    assert_eq!(app.phase(), "focus · click the sky or press space to begin");
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");
@@ -419,17 +419,16 @@ fn skipping_the_long_break_in_the_second_it_starts_begins_a_new_cycle_once() {
 }
 
 #[test]
-fn the_offer_to_name_a_block_shows_only_with_the_controls() {
+fn the_offer_to_name_a_block_shows_while_it_waits() {
     let mut app = App::new();
     let ink = |app: &App| {
         let e = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("top-text")).unwrap();
         e.text_color.map_or(1.0, |c| c.a) * e.opacity
     };
-    assert!(ink(&app) < 0.01, "a hover offer is hidden while the pointer is away");
-    app.rt.pointer_move(200.0, 300.0);
-    app.wait(STEP);
-    assert!(ink(&app) >= READABLE);
-    assert_eq!(app.read("top-text").as_deref(), Some("+ name this block"));
+    assert_eq!(app.read("top-text").as_deref(), Some("+ name this block"), "in sight with the block, pointer or not");
+    app.space();
+    app.look();
+    assert!(ink(&app) < 0.01, "and gone once the block runs unnamed");
 }
 
 #[test]
@@ -524,7 +523,7 @@ fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
     };
     let names: Vec<String> =
         ["control-play", "control-today", "control-place", "control-keys"].iter().map(|k| control(&app, k)).collect();
-    assert_eq!(names, ["Start", "Today", "Place: Coast", "Keys"]);
+    assert_eq!(names, ["Start focus", "Today", "Place: Coast", "Keys"]);
     app.voiceover_press("control-play");
     app.wait(2.0);
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()), "pressed as a click would");

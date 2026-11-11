@@ -162,16 +162,26 @@ CHECKS = [
         lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time remaining",
     ),
     (
-        "the hover controls show while the pointer moves",
+        "while a block waits, the controls stay out and Start focus says what it does",
+        "hover",
+        "waiting",
+        lambda t: (
+            opacity(t, "control-play-look") == 1.0
+            and t["@a11y"].get("control-play", {}).get("name") == "Start focus"
+            and opacity(t, "control-today-look") == 1.0
+        ),
+    ),
+    (
+        "once it runs they come out while the pointer moves",
         "hover",
         "shown",
         lambda t: opacity(t, "control-play-look") == 1.0,
     ),
     (
-        "and fade once it rests, even with the clock stopped, staying where VoiceOver finds them",
+        "and fade once it rests, staying where VoiceOver finds them",
         "hover",
         "rested",
-        lambda t: opacity(t, "control-play-look") == 0.0 and t["@a11y"].get("control-play", {}).get("name") == "Start",
+        lambda t: opacity(t, "control-play-look") == 0.0 and t["@a11y"].get("control-play", {}).get("name") == "Pause",
     ),
     (
         "a label is typed without starting the clock, and arrows set one minute",
@@ -347,7 +357,7 @@ CHECKS = [
         "the click that brings the window forward starts nothing",
         "activate",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
     ),
     (
         "the next click starts the sunset",
@@ -356,10 +366,10 @@ CHECKS = [
         lambda t: phase(t) == "focus" and text(t, "time") != "25:00",
     ),
     (
-        "the activating click on a hover control does nothing either",
+        "the activating click on a control does nothing either",
         "activate-control",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
     (
@@ -372,13 +382,13 @@ CHECKS = [
         "a click in their corner, off any control, never reaches the sky",
         "dock",
         "corner-click",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: phase(t) == "focus",
     ),
     (
         "nor does a click where a control has faded",
         "dock",
         "faded-click",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: phase(t) == "focus",
     ),
     (
         "letting go of the sun sets a shorter block and starts nothing",

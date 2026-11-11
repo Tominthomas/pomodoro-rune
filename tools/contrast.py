@@ -3,8 +3,9 @@
 in each moment the review pack shoots and in Today. For each text element it crops the render to
 the element's box and compares the glyphs' cores (the brightest 3% of pixels for light ink, the
 darkest for dark ink) with the ground under them (the median), as WCAG relative luminance. Every
-text is measured as drawn, however faint, except the offers that only show on hover; the time and
-the phase line must be on every scene but Today. Prints the lowest per scene and overall.
+text in sight is measured as drawn, however faint. Text drawn invisible is left out: the controls
+while they have receded, and the bell's words on the scene, which are there for VoiceOver. The time
+and the phase line must be on every scene but Today. Prints the lowest per scene and overall.
 
     cargo build --release && python3 tools/contrast.py
 """
@@ -33,9 +34,8 @@ SCENES = {
     "today": "today",
 }
 TARGET = 4.5
-# Drawn transparent until the pointer moves: the offer to name a block, Today beside the time, and
-# the hover controls.
-HOVER_OFFERS = {"+ name this block", "Today \u203a"}
+# Text drawn less opaque than this is not in sight: its colour's alpha times the opacity it inherits.
+UNSEEN = 0.05
 REQUIRED = ("time", "phase")
 
 
@@ -76,26 +76,15 @@ def light_ink(color):
     return True
 
 
-def hover_offer(e):
-    return e["text"] in HOVER_OFFERS or "/controls/" in e["path"]
-
-
-def unseen(e):
-    """Text drawn fully transparent, for assistive technology alone, such as the bell's status on
-    the scene, where the phase line already says it."""
-    color = e.get("color")
-    return isinstance(color, str) and len(color) == 9 and color.endswith("00")
+def ink(e):
+    color, opacity = e.get("color"), e.get("opacity")
+    alpha = int(color[7:9], 16) / 255 if isinstance(color, str) and len(color) == 9 else 1.0
+    return alpha * (1.0 if opacity is None else opacity)
 
 
 def texts(elements):
     for e in elements:
-        if (
-            e.get("text")
-            and e.get("rect")
-            and e["text"].strip() not in ("", "·")
-            and not hover_offer(e)
-            and not unseen(e)
-        ):
+        if e.get("text") and e.get("rect") and e["text"].strip() not in ("", "·") and ink(e) >= UNSEEN:
             yield e
 
 

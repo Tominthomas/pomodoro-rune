@@ -1,23 +1,23 @@
 //! The controls, bottom right: start or pause, let go (or skip a break), Today, the place and
-//! the keys. They come out while the pointer moves or after Tab, each with a tooltip naming its
-//! key, and stay while the pointer rests on their corner. Hidden, only their look goes: they
-//! take no clicks and no focus, their corner still keeps clicks from the sky, and `VoiceOver`
-//! still finds and presses them. `?` opens every key at once.
-
-use std::f32::consts::TAU;
+//! the keys. While a block or a break waits they stay out, each saying what it does, with
+//! "Start focus" first. Once it runs they recede: they come out while the pointer moves or after
+//! Tab, and stay while the pointer rests on their corner. Hidden, only their look goes: they take
+//! no clicks and no focus, their corner still keeps clicks from the sky, and `VoiceOver` still
+//! finds and presses them. Each has a tooltip naming its key; `?` opens every key at once.
 
 use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
 use rune::{El, PopupMenu, Tx, canvas, col, el, row, text};
 
-use crate::drawing::ring;
-use crate::readout::{BRIGHT, QUIET, SMALL, button, line, pill};
+use crate::readout::{BRIGHT, QUIET, SMALL, button, line};
 use crate::theme::{Ink, PLACES, Place, rgb};
 use crate::timer::{Clock, Event, Phase};
 use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
 
 /// The corner the controls live in, measured from the window's bottom right.
-const DOCK: (f32, f32) = (236.0, 56.0);
+const DOCK: (f32, f32) = (330.0, 56.0);
+/// How tall the dock's quieter controls stand.
+const TALL: f32 = 28.0;
 
 /// Runs a control's action, unless it is the click that brought the window forward. A click
 /// leaves no focus behind, so Space goes back to the timer.
@@ -42,92 +42,121 @@ fn docked(k: Ink, key: &str, label: &str, keys: &str, radius: f32, shown: bool, 
         .shortcut_hint(keys.to_string())
         .focusable(shown)
         .focus_ring(1.5, 1.5, k.text.alpha(0.95))
-        .child(look.key(format!("{key}-look")).opacity(if shown { 1.0 } else { 0.0 }))
+        .child(look.key(format!("{key}-look")).animated_changes().opacity(if shown { 1.0 } else { 0.0 }))
 }
 
-fn icon(k: Ink, size: f32, glyph: El) -> El {
-    el().size(size, size).radius(size / 2.0).center().fill(k.shade.alpha(0.45)).hover(k.text.alpha(0.14)).child(glyph)
+/// A quiet control's look: its words on a soft pill.
+fn tab(k: Ink, words: &str) -> El {
+    row()
+        .h(TALL)
+        .px(11.0)
+        .gap(5.0)
+        .center_y()
+        .radius(TALL / 2.0)
+        .fill(k.shade.alpha(0.5))
+        .border(1.0, k.text.alpha(0.42))
+        .hover(k.text.alpha(0.12))
+        .child(line(k, words, SMALL, 540.0, BRIGHT))
+}
+
+/// The waiting block's way in: what pressing it starts, in words, drawn in the ink itself.
+fn primary(k: Ink, words: &str) -> El {
+    let on = Ink { text: k.shade, shade: k.text };
+    let triangle = Shape::new().fill(vec![[1.0, 0.5], [9.0, 5.5], [1.0, 10.5]], on.text);
+    row()
+        .h(34.0)
+        .pl(13.0)
+        .pr(15.0)
+        .gap(7.0)
+        .center_y()
+        .radius(17.0)
+        .fill(k.text.alpha(0.92))
+        .hover(k.shade.alpha(0.12))
+        .child(canvas(triangle).size(10.0, 11.0))
+        .child(line(on, words, 12.0, 600.0, 1.0))
 }
 
 pub fn view(s: &State, k: Ink) -> El {
     let shown = s.controls_shown();
     let t = &s.timer;
-    let c = k.text.alpha(BRIGHT);
-    let running = matches!(t.clock, Clock::Ticking { .. });
-    // Play is the primary control: larger, and drawn in the ink itself.
-    let on = k.shade;
-    let play = if running {
-        Shape::new().line([5.0, 3.0], [5.0, 13.0], 2.4, LineCap::Round, on).line(
-            [11.0, 3.0],
-            [11.0, 13.0],
-            2.4,
-            LineCap::Round,
-            on,
-        )
+    let press = act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx));
+    let play = if matches!(t.clock, Clock::Wound | Clock::Scrubbing { .. }) {
+        let words = if t.phase == Phase::Focus { "Start focus" } else { "Start break" };
+        docked(k, "control-play", words, "Space", 17.0, shown, primary(k, words))
     } else {
-        Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on)
+        // Running, the primary control is a glyph, small enough to recede with the rest.
+        let on = k.shade;
+        let (glyph, label) = match t.clock {
+            Clock::Ticking { .. } => (
+                Shape::new().line([5.0, 3.0], [5.0, 13.0], 2.4, LineCap::Round, on).line(
+                    [11.0, 3.0],
+                    [11.0, 13.0],
+                    2.4,
+                    LineCap::Round,
+                    on,
+                ),
+                "Pause",
+            ),
+            Clock::Paused { .. } => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Resume"),
+            _ => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Start"),
+        };
+        let look = el()
+            .size(38.0, 38.0)
+            .radius(19.0)
+            .center()
+            .fill(k.text.alpha(0.92))
+            .hover(k.shade.alpha(0.12))
+            .child(canvas(glyph).size(16.0, 16.0));
+        docked(k, "control-play", label, "Space", 19.0, shown, look)
     };
-    let play_label = match t.clock {
-        Clock::Ticking { .. } => "Pause",
-        Clock::Paused { .. } => "Resume",
-        _ => "Start",
-    };
-    let look = el()
-        .size(38.0, 38.0)
-        .radius(19.0)
-        .center()
-        .fill(k.text.alpha(0.92))
-        .hover(k.shade.alpha(0.12))
-        .child(canvas(play).size(16.0, 16.0));
-    let play = docked(k, "control-play", play_label, "Space", 19.0, shown, look)
-        .on_press_tx(act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx)));
-    let mut r = row().key("controls").gap(6.0).center_y();
+    // The controls change places at once as the set changes, so no word ever slides over another;
+    // only their looks fade.
+    let mut r = row().key("controls").gap(6.0).center_y().instant_changes();
     let started = matches!(t.clock, Clock::Ticking { .. } | Clock::Paused { .. });
+    let skip = act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx));
     if t.phase == Phase::Focus && started {
         // Letting go is a word, not a glyph: it's the one action that ends a block.
         r = r.child(
-            docked(k, "control-skip", "Let go of this block", "S", 12.0, shown, pill(k, "let go"))
-                .on_press_tx(act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx))),
+            docked(k, "control-skip", "Let go of this block", "S", 14.0, shown, tab(k, "let go")).on_press_tx(skip),
         );
     } else if t.phase != Phase::Focus && !matches!(t.clock, Clock::Ringing { .. }) {
-        let glyph = Shape::new().fill(vec![[2.5, 3.0], [8.5, 7.0], [2.5, 11.0]], c).line(
-            [11.0, 3.0],
-            [11.0, 11.0],
-            1.6,
-            LineCap::Round,
-            c,
-        );
-        r = r.child(
-            docked(k, "control-skip", "Skip break", "S", 15.0, shown, icon(k, 30.0, canvas(glyph).size(14.0, 14.0)))
-                .on_press_tx(act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx))),
-        );
+        r = r.child(docked(k, "control-skip", "Skip break", "S", 14.0, shown, tab(k, "skip")).on_press_tx(skip));
     }
-    r = r.child(play);
-    // Today: the day's lanterns as a small bar chart.
-    let today = Shape::new()
-        .line([1.5, 12.5], [12.5, 12.5], 1.2, LineCap::Round, c)
-        .line([3.5, 10.0], [3.5, 7.0], 2.2, LineCap::Round, c)
-        .line([7.0, 10.0], [7.0, 3.0], 2.2, LineCap::Round, c)
-        .line([10.5, 10.0], [10.5, 5.5], 2.2, LineCap::Round, c);
-    // A place: hills under a low sun.
-    let place = Shape::new()
-        .fill(vec![[0.5, 12.5], [5.0, 5.0], [8.0, 9.0], [10.0, 7.0], [13.5, 12.5]], c)
-        .fill(ring([10.5, 3.2], [1.8, 1.8], 12, 0.0, TAU), c);
-    let place_label = format!("Place: {}", Place::at(s.place).name);
-    let keys = text("?").font(TextStyle::new(13.0, 620.0)).color(c);
+    let place = Place::at(s.place).name;
+    let chevron = Shape::new().line([1.0, 2.5], [4.0, 5.5], 1.4, LineCap::Round, k.text.alpha(QUIET)).line(
+        [4.0, 5.5],
+        [7.0, 2.5],
+        1.4,
+        LineCap::Round,
+        k.text.alpha(QUIET),
+    );
+    let keys = el()
+        .size(TALL, TALL)
+        .radius(TALL / 2.0)
+        .center()
+        .fill(k.shade.alpha(0.5))
+        .border(1.0, k.text.alpha(0.42))
+        .hover(k.text.alpha(0.12))
+        .child(text("?").font(TextStyle::new(13.0, 620.0)).color(k.text.alpha(BRIGHT)));
     let r = r
+        .child(play.on_press_tx(press))
         .child(
-            docked(k, "control-today", "Today", "H", 15.0, shown, icon(k, 30.0, canvas(today).size(14.0, 14.0)))
+            docked(k, "control-today", "Today", "H", 14.0, shown, tab(k, "Today"))
                 .on_press_tx(act(|s, _| open_today(s, true))),
         )
         .child(
-            docked(k, "control-place", &place_label, "T", 15.0, shown, icon(k, 30.0, canvas(place).size(14.0, 14.0)))
-                .on_press_tx(act(pick_place)),
+            docked(
+                k,
+                "control-place",
+                &format!("Place: {place}"),
+                "T",
+                14.0,
+                shown,
+                tab(k, place).child(canvas(chevron).size(8.0, 8.0)),
+            )
+            .on_press_tx(act(pick_place)),
         )
-        .child(
-            docked(k, "control-keys", "Keys", "?", 15.0, shown, icon(k, 30.0, keys))
-                .on_press_tx(act(|s, _| s.keys_open = true)),
-        );
+        .child(docked(k, "control-keys", "Keys", "?", 14.0, shown, keys).on_press_tx(act(|s, _| s.keys_open = true)));
     // The corner itself takes the pointer: resting there keeps the controls out, and a click
     // aimed at a fading control never reaches the sky behind it. While they are hidden a cover
     // over them takes the click instead.

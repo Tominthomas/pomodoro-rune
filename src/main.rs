@@ -82,7 +82,7 @@ pub enum Asking {
 /// window must redraw without a frame between.
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct Timed {
-    controls: bool,
+    beckoned: bool,
     asking: Asking,
     day: Day,
 }
@@ -255,10 +255,24 @@ impl State {
         (looks(water), looks(stars))
     }
 
-    /// Whether the controls show: while the pointer moves over the window or rests on them, or
-    /// after Tab.
+    /// Whether the controls show: always while a block or a break waits to start, so the first
+    /// thing to do is in sight, and once it runs, only while beckoned.
     fn controls_shown(&self) -> bool {
+        matches!(self.timer.clock, Clock::Wound | Clock::Scrubbing { .. }) || self.beckoned()
+    }
+
+    /// Whether the pointer or the keyboard has called the hover controls out: the pointer moves
+    /// over the window or rests on them, or Tab was pressed.
+    fn beckoned(&self) -> bool {
         self.keyboard || self.over_controls || self.controls_until > self.now
+    }
+
+    /// Whether the first-use hint is out: before the first block, until it is put away.
+    pub fn teaching(&self) -> bool {
+        self.hint
+            && self.study.log.blocks.is_empty()
+            && self.timer.phase == Phase::Focus
+            && self.timer.clock == Clock::Wound
     }
 
     /// What the reflection shows now: open from the bell until a word is given (then noted
@@ -279,7 +293,7 @@ impl State {
     }
 
     fn timed(&self) -> Timed {
-        Timed { controls: self.controls_shown(), asking: self.asking(), day: self.today() }
+        Timed { beckoned: self.beckoned(), asking: self.asking(), day: self.today() }
     }
 
     /// The next moment the window must wake by the clock alone, on the window's clock: when
@@ -611,7 +625,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     };
     let root =
         el().size(W, H).clip_rounded(0.0).window_drag().on_pointer_move_local(|s: &mut State, _, tx: &mut Tx| {
-            let shown = s.controls_shown();
+            let shown = s.beckoned();
             s.keyboard = false;
             s.controls_until = tx.clock() + CONTROLS_LINGER;
             tx.wake_at(s.controls_until);

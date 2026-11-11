@@ -10,7 +10,7 @@ use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, canvas, col, el, row, 
 use crate::log::{self, Felt};
 use crate::theme::{H, Ink, W};
 use crate::timer::{Clock, Event, Phase, Timer};
-use crate::{Asking, State, carry, edit_label, finish_label, guarded, open_today, rate};
+use crate::{Asking, State, carry, edit_label, finish_label, guarded, rate};
 
 /// Text on the scene: the main line, and the quieter ones under it. Both keep 4.5:1 on the
 /// shade behind the readout.
@@ -102,6 +102,7 @@ pub fn phase_line(s: &State) -> &'static str {
         (Phase::Focus, Clock::Ringing { .. }) => "let go; the minutes still count",
         (_, Clock::Paused { .. }) => "paused · space to resume",
         (_, Clock::Scrubbing { .. }) => "release to set the length",
+        (Phase::Focus, Clock::Wound) if s.teaching() => "focus · click the sky or press space to begin",
         (Phase::Focus, Clock::Wound) => "focus · space to begin",
         (Phase::Focus, _) => "focus",
         (_, Clock::Ringing { .. }) => "the break is over",
@@ -162,13 +163,13 @@ pub fn view(s: &State, k: Ink) -> El {
     }
     out = out.child(time_row(s, k)).child(line(k, phase_line(s), SMALL, 460.0, QUIET).key("phase"));
     let mut offers = col().key("offers").gap(6.0).items_start();
-    if s.hint && s.study.log.blocks.is_empty() && t.phase == Phase::Focus && t.clock == Clock::Wound {
+    if s.teaching() {
         offers = offers.child(
             row()
                 .key("hint")
                 .gap(8.0)
                 .center_y()
-                .child(line(k, "drag the sun or press ↑ ↓ to set the length", 11.0, 480.0, BRIGHT))
+                .child(line(k, "or drag the sun first to change the length", 11.0, 480.0, BRIGHT))
                 .child(
                     button(k, "hint-dismiss", "got it", "Hide this hint")
                         .on_press_tx(guarded(|s, _| s.put_hint_away())),
@@ -230,15 +231,9 @@ fn label(s: &State, k: Ink) -> El {
             .on_submit(|s: &mut State, tx: &mut Tx| finish_label(s, true, tx));
     }
     let named = s.label();
-    // Unnamed, the offer to name the block shows only while the controls do.
-    let shy = named.is_none() && !(s.controls_shown() && s.timer.clock == Clock::Wound);
-    let alpha = if named.is_some() {
-        BRIGHT
-    } else if shy {
-        0.0
-    } else {
-        QUIET
-    };
+    // Unnamed, the offer to name the block shows only while the block waits.
+    let shy = named.is_none() && s.timer.clock != Clock::Wound;
+    let alpha = if shy { 0.0 } else { BRIGHT };
     let full = named.unwrap_or_else(|| "+ name this block".into());
     let el = row()
         .key("top")
@@ -253,8 +248,8 @@ fn label(s: &State, k: Ink) -> El {
     if shy { el.inert() } else { el.focusable(true) }
 }
 
-/// The time, with a pause mark while held and, while it waits and the controls are out, a
-/// minute either way. Pressed, it opens Today; under the pointer it says so.
+/// The time, with a pause mark while held and, while it waits, a minute either way: drawn once
+/// the pointer or Tab calls the controls out, and always there for `VoiceOver`.
 fn time_row(s: &State, k: Ink) -> El {
     let t = &s.timer;
     // A block that just ended shows what it came to, not the time left, and says which.
@@ -275,17 +270,6 @@ fn time_row(s: &State, k: Ink) -> El {
     if let Some(unit) = unit {
         time = time.child(line(k, unit, LEAD, 480.0, QUIET).key("time-unit").pb(6.0).a11y_hidden());
     }
-    let today = row()
-        .key("time-today")
-        .hover_group()
-        .role("button")
-        .label("Today")
-        .help("Today and the last four weeks  H")
-        .gap(6.0)
-        .items_end()
-        .on_press_tx(guarded(|s, _| open_today(s, true)))
-        .child(time)
-        .child(line(k, "Today ›", 11.0, 520.0, QUIET).group_opacity(0.0, 1.0).pb(6.0));
     let mut r = row().gap(8.0).center_y();
     if matches!(t.clock, Clock::Paused { .. }) {
         let c = k.text.alpha(BRIGHT);
@@ -298,27 +282,31 @@ fn time_row(s: &State, k: Ink) -> El {
         );
         r = r.child(canvas(bars).key("paused-mark").size(11.0, 14.0));
     }
-    r = r.child(today);
-    if t.clock == Clock::Wound && s.controls_shown() {
-        r = r.child(el().w(6.0)).child(stepper(k, "shorter", "−", "A minute shorter  ↓", -1)).child(stepper(
+    r = r.child(time);
+    if t.clock == Clock::Wound {
+        let shown = s.beckoned();
+        r = r.child(el().w(6.0)).child(stepper(k, "shorter", "−", "A minute shorter  ↓", -1, shown)).child(stepper(
             k,
             "longer",
             "+",
             "A minute longer  ↑",
             1,
+            shown,
         ));
     }
     r
 }
 
-fn stepper(k: Ink, key: &'static str, glyph: &str, help: &str, minutes: i32) -> El {
+/// A minute either way. Dragging the sun is the way the hint teaches; these are the same thing for
+/// the keyboard and assistive technology, so they are always in the tree and drawn when beckoned.
+fn stepper(k: Ink, key: &'static str, glyph: &str, help: &str, minutes: i32, shown: bool) -> El {
     el().key(key)
         .size(HIT, HIT)
         .center()
         .role("button")
         .label(help.split("  ").next().unwrap_or(help).to_string())
         .help(help.to_string())
-        .focusable(true)
+        .focusable(shown)
         .focus_ring(1.5, 0.0, k.text.alpha(0.9))
         .hover_group()
         .radius(12.0)
@@ -330,6 +318,7 @@ fn stepper(k: Ink, key: &'static str, glyph: &str, help: &str, minutes: i32) -> 
                 .fill(k.shade.alpha(0.55))
                 .border(1.0, k.text.alpha(0.35))
                 .group_color(k.text.alpha(0.2))
+                .opacity(if shown { 1.0 } else { 0.0 })
                 .child(line(k, glyph, 14.0, 500.0, BRIGHT)),
         )
 }

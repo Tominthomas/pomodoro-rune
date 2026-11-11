@@ -115,8 +115,15 @@ SCRIPTS = {
         {"t": 3.6, "type": "tap", "x": SKY[0], "y": SKY[1]},
         mark(5.0, "resumed"),
     ],
-    # The pointer passes over the waiting window, then rests: the controls come and go.
-    "hover": [{"t": 0.3, "type": "move", "x": 200.0, "y": 300.0}, mark(1.0, "shown"), mark(4.0, "rested")],
+    # The controls wait in sight with the block; once it runs, the pointer passes over the window,
+    # then rests, and they come and go.
+    "hover": [
+        mark(0.2, "waiting"),
+        key(0.4, " "),
+        {"t": 0.6, "type": "move", "x": 200.0, "y": 300.0},
+        mark(1.4, "shown"),
+        mark(4.6, "rested"),
+    ],
     # A block let go and taken straight back runs on to its bell as one block.
     "undo": [
         *one_minute(0.1),
@@ -176,12 +183,13 @@ SCRIPTS = {
         {"t": 3.0, "type": "tap", "key": "control-play"},
         mark(4.0, "started"),
     ],
-    # The pointer rests on the controls' corner: they stay. A click in the corner off any
-    # control, and one where a control has faded, never reach the sky.
+    # With a block running, the pointer rests on the controls' corner: they stay. A click in the
+    # corner off any control, and one where a control has faded, never reach the sky.
     "dock": [
+        key(0.2, " "),
         {"t": 0.3, "type": "move", "x": 300, "y": 515},
         mark(5.0, "resting"),
-        {"t": 5.5, "type": "tap", "x": 150, "y": 520},
+        {"t": 5.5, "type": "tap", "x": 70, "y": 525},
         mark(6.5, "corner-click"),
         {"t": 7.0, "type": "move", "x": 190, "y": 200},
         {"t": 7.1, "type": "move", "x": 190, "y": 202},
