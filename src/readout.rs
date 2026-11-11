@@ -135,7 +135,7 @@ pub fn view(s: &State, k: Ink) -> El {
                 ),
         );
     }
-    if t.can_undo(s.now) {
+    if t.can_undo() {
         let undo = row()
             .key("undo")
             .role("button")

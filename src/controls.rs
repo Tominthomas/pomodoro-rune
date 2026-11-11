@@ -88,7 +88,7 @@ pub fn view(s: &State, k: Ink) -> El {
     if t.phase == Phase::Focus && started {
         // Letting go is a word, not a glyph: it's the one action that ends a block.
         r = r.child(
-            button(k, "control-skip", "let go", "Let go of this block; undo for a few seconds  S")
+            button(k, "control-skip", "let go", "Let go of this block  S")
                 .on_press_tx(act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx))),
         );
     } else if t.phase != Phase::Focus && !matches!(t.clock, Clock::Ringing { .. }) {
@@ -168,7 +168,7 @@ const KEYS: [(&str, &str); 12] = [
     ("↑  ↓", "a minute longer or shorter, while it waits"),
     ("drag", "the sun up or down to set the length; space starts it"),
     ("S", "let go of a block, or skip a break"),
-    ("U", "undo a let go, for a few seconds"),
+    ("U", "undo a let go, until you start again"),
     ("L", "name the next block"),
     ("1  2  3", "how it felt: deep, steady, drifting"),
     ("H", "Today and the last four weeks"),

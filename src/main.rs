@@ -273,9 +273,11 @@ impl State {
         Timed { controls: self.controls_shown(), asking: self.asking(), day: self.today() }
     }
 
-    /// The next moment `timed` can change by the clock alone, on the window's clock.
+    /// The next moment the window must wake by the clock alone, on the window's clock: when
+    /// `timed` can change, or the timer has a deadline.
     fn next_change(&self) -> f64 {
         let mut at = vec![self.cal.next_day(self.unix()) as f64 - self.epoch];
+        at.extend(self.timer.due());
         if self.controls_until > self.now {
             at.push(self.controls_until);
         }

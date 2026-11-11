@@ -162,6 +162,20 @@ impl App {
         self.rt.find(key).is_some()
     }
 
+    /// The accessibility node keyed `key`, as `VoiceOver` is given it: role, name, value, actions.
+    fn node(&self, key: &str) -> Option<Value> {
+        let mut stack = vec![self.rt.accessibility_json()];
+        while let Some(mut n) = stack.pop() {
+            if n["key"] == key {
+                return Some(n);
+            }
+            if let Value::Array(children) = n["children"].take() {
+                stack.extend(children);
+            }
+        }
+        None
+    }
+
     /// The lanterns floating on the water.
     fn lanterns(&self) -> usize {
         (0..=timer::CYCLE).take_while(|i| self.has(&format!("lantern-{i}"))).count()
@@ -438,4 +452,47 @@ fn an_idle_window_wakes_at_four_in_the_morning_and_turns_the_day() {
     assert!(s.study.roll_over(s.cal, s.unix(), &s.timer).is_some(), "and a new cycle begins");
     let (water, stars) = s.lanterns();
     assert_eq!((stars.len(), water.len()), (0, 0), "yesterday's lantern has left today's sky");
+}
+
+#[test]
+fn a_block_let_go_can_be_taken_back_until_the_next_start_even_from_today() {
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    app.wait(20.0);
+    app.char("s");
+    // One ten-minute step with no frames in it: only the wakes the window asked for run.
+    app.rt.frame(600.0);
+    app.settle();
+    assert_eq!(app.phase(), "rest · space when you're ready", "the quiet ring ended on its own wake");
+    assert!(app.has("undo"), "ten minutes on, the offer stands");
+    app.char("h");
+    app.look();
+    app.char("u");
+    app.key(Key::Escape);
+    app.look();
+    assert_eq!(app.lanterns(), 1, "it ran on all along, so it is over, and lit");
+    let mut started = App::new();
+    started.one_minute();
+    started.space();
+    started.wait(20.0);
+    started.char("s");
+    started.wait(RING + 0.5);
+    started.space();
+    started.char("u");
+    assert!(!started.has("undo") && started.phase() == "rest", "once the break starts, it can't be");
+}
+
+#[test]
+fn a_still_window_wakes_for_the_bell_it_owes() {
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    // An hour in one step: if the bell's wake were missing, the block would end at the hour.
+    app.rt.frame(3600.0);
+    app.settle();
+    app.char("h");
+    app.look();
+    let lantern = app.node("day-lantern-0").expect("the block is in Today");
+    assert!(lantern["name"].as_str().unwrap().starts_with("14:00 – 14:01 · 1 min"), "{lantern}");
 }
