@@ -42,6 +42,8 @@ if has cargo-deny; then
   step "cargo deny"
   cargo deny --locked check advisories licenses sources
 fi
+step "file sizes and folder shape"
+python3 tools/shape.py
 step "cargo clippy"
 cargo clippy --locked --all-targets --release -- -D warnings
 step "cargo doc"
