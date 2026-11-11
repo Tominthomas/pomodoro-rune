@@ -608,6 +608,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
             // break it rings in and every break opening into a dawn, so nothing cross-fades.
             let sky = el()
                 .key("sky")
+                .role("none")
                 .absolute(0.0, 0.0)
                 .size(W, H)
                 .on_drag(drag)

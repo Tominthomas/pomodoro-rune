@@ -119,6 +119,12 @@ impl App {
         self.wait(STEP);
     }
 
+    /// Presses the element keyed `key` as `VoiceOver` does, through its accessibility action.
+    fn voiceover_press(&mut self, key: &str) {
+        assert!(self.rt.accessibility_action(key, rune::accesskit::Action::Click, None), "{key} takes a press");
+        self.wait(STEP);
+    }
+
     /// Sets the waiting block to one minute with the arrow keys, as the headless scripts do.
     fn one_minute(&mut self) {
         for _ in 0..24 {
@@ -495,4 +501,29 @@ fn a_still_window_wakes_for_the_bell_it_owes() {
     app.look();
     let lantern = app.node("day-lantern-0").expect("the block is in Today");
     assert!(lantern["name"].as_str().unwrap().starts_with("14:00 – 14:01 · 1 min"), "{lantern}");
+}
+
+#[test]
+fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
+    let mut app = App::new();
+    let control = |app: &App, key: &str| {
+        let n = app.node(key).unwrap_or_else(|| panic!("{key} is in the accessibility tree"));
+        assert_eq!(n["role"], "button", "{n}");
+        assert!(n["actions"].as_array().is_some_and(|a| a.contains(&"click".into())), "{key} can be pressed: {n}");
+        n["name"].as_str().unwrap_or_default().to_string()
+    };
+    let names: Vec<String> =
+        ["control-play", "control-today", "control-place", "control-keys"].iter().map(|k| control(&app, k)).collect();
+    assert_eq!(names, ["Start", "Today", "Place: Coast", "Keys"]);
+    app.voiceover_press("control-play");
+    app.wait(2.0);
+    assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()), "pressed as a click would");
+    assert_eq!(
+        (control(&app, "control-play"), control(&app, "control-skip")),
+        ("Pause".into(), "Let go of this block".into())
+    );
+    app.voiceover_press("control-play");
+    app.wait(1.0);
+    assert_eq!(app.phase(), "paused · space to resume");
+    assert_eq!(control(&app, "control-play"), "Resume");
 }

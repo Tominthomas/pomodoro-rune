@@ -680,6 +680,7 @@ pub fn backdrop(scene: El, place: &Place, dark: bool) -> El {
         (place.pal(0.5).low.mix(rgb(0xfbf8f3), 0.72), 0.62)
     };
     el().size(W, H)
+        .a11y_hidden()
         .fill(ground)
         .child(scene.blur(14.0))
         .child(el().pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).fill(ground.alpha(veil)))

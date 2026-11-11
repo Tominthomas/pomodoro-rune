@@ -1,7 +1,8 @@
 //! The controls, bottom right: start or pause, let go (or skip a break), Today, the place and
 //! the keys. They come out while the pointer moves or after Tab, each with a tooltip naming its
-//! key, and stay while the pointer rests on their corner. Hidden, they take no clicks and no
-//! focus, and their corner still keeps clicks from the sky. `?` opens every key at once.
+//! key, and stay while the pointer rests on their corner. Hidden, only their look goes: they
+//! take no clicks and no focus, their corner still keeps clicks from the sky, and `VoiceOver`
+//! still finds and presses them. `?` opens every key at once.
 
 use std::f32::consts::TAU;
 
@@ -10,7 +11,7 @@ use rune::tok::TextStyle;
 use rune::{El, PopupMenu, Tx, canvas, col, el, row, text};
 
 use crate::drawing::ring;
-use crate::readout::{BRIGHT, QUIET, SMALL, button, line};
+use crate::readout::{BRIGHT, QUIET, SMALL, button, line, pill};
 use crate::theme::{Ink, PLACES, Place, rgb};
 use crate::timer::{Clock, Event, Phase};
 use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
@@ -29,20 +30,23 @@ fn act(f: impl Fn(&mut State, &mut Tx) + 'static) -> impl Fn(&mut State, &mut Tx
     })
 }
 
-fn icon(k: Ink, key: &str, label: &str, keys: &str, size: f32, glyph: El) -> El {
+/// A control in the dock: the button the keyboard and assistive technology reach, around `look`,
+/// which draws it only while the dock is out. The button itself never fades, since a faded
+/// element leaves the accessibility tree.
+fn docked(k: Ink, key: &str, label: &str, keys: &str, radius: f32, shown: bool, look: El) -> El {
     el().key(key.to_string())
-        .size(size, size)
-        .radius(size / 2.0)
-        .center()
-        .fill(k.shade.alpha(0.45))
-        .hover(k.text.alpha(0.14))
+        .radius(radius)
         .role("button")
         .label(label.to_string())
         .help(format!("{label}  {keys}"))
         .shortcut_hint(keys.to_string())
-        .focusable(true)
+        .focusable(shown)
         .focus_ring(1.5, 1.5, k.text.alpha(0.95))
-        .child(glyph)
+        .child(look.key(format!("{key}-look")).opacity(if shown { 1.0 } else { 0.0 }))
+}
+
+fn icon(k: Ink, size: f32, glyph: El) -> El {
+    el().size(size, size).radius(size / 2.0).center().fill(k.shade.alpha(0.45)).hover(k.text.alpha(0.14)).child(glyph)
 }
 
 pub fn view(s: &State, k: Ink) -> El {
@@ -68,27 +72,21 @@ pub fn view(s: &State, k: Ink) -> El {
         Clock::Paused { .. } => "Resume",
         _ => "Start",
     };
-    let play = el()
-        .key("control-play")
+    let look = el()
         .size(38.0, 38.0)
         .radius(19.0)
         .center()
         .fill(k.text.alpha(0.92))
         .hover(k.shade.alpha(0.12))
-        .role("button")
-        .label(play_label)
-        .help(format!("{play_label}  Space"))
-        .shortcut_hint("Space")
-        .focusable(true)
-        .focus_ring(1.5, 1.5, k.text.alpha(0.95))
-        .child(canvas(play).size(16.0, 16.0))
+        .child(canvas(play).size(16.0, 16.0));
+    let play = docked(k, "control-play", play_label, "Space", 19.0, shown, look)
         .on_press_tx(act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx)));
-    let mut r = row().key("controls").gap(6.0).center_y().opacity(if shown { 1.0 } else { 0.0 });
+    let mut r = row().key("controls").gap(6.0).center_y();
     let started = matches!(t.clock, Clock::Ticking { .. } | Clock::Paused { .. });
     if t.phase == Phase::Focus && started {
         // Letting go is a word, not a glyph: it's the one action that ends a block.
         r = r.child(
-            button(k, "control-skip", "let go", "Let go of this block  S")
+            docked(k, "control-skip", "Let go of this block", "S", 12.0, shown, pill(k, "let go"))
                 .on_press_tx(act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx))),
         );
     } else if t.phase != Phase::Focus && !matches!(t.clock, Clock::Ringing { .. }) {
@@ -100,7 +98,7 @@ pub fn view(s: &State, k: Ink) -> El {
             c,
         );
         r = r.child(
-            icon(k, "control-skip", "Skip break", "S", 30.0, canvas(glyph).size(14.0, 14.0))
+            docked(k, "control-skip", "Skip break", "S", 15.0, shown, icon(k, 30.0, canvas(glyph).size(14.0, 14.0)))
                 .on_press_tx(act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx))),
         );
     }
@@ -115,33 +113,29 @@ pub fn view(s: &State, k: Ink) -> El {
     let place = Shape::new()
         .fill(vec![[0.5, 12.5], [5.0, 5.0], [8.0, 9.0], [10.0, 7.0], [13.5, 12.5]], c)
         .fill(ring([10.5, 3.2], [1.8, 1.8], 12, 0.0, TAU), c);
+    let place_label = format!("Place: {}", Place::at(s.place).name);
+    let keys = text("?").font(TextStyle::new(13.0, 620.0)).color(c);
     let r = r
         .child(
-            icon(k, "control-today", "Today", "H", 30.0, canvas(today).size(14.0, 14.0))
+            docked(k, "control-today", "Today", "H", 15.0, shown, icon(k, 30.0, canvas(today).size(14.0, 14.0)))
                 .on_press_tx(act(|s, _| open_today(s, true))),
         )
         .child(
-            icon(
-                k,
-                "control-place",
-                &format!("Place: {}", Place::at(s.place).name),
-                "T",
-                30.0,
-                canvas(place).size(14.0, 14.0),
-            )
-            .on_press_tx(act(pick_place)),
+            docked(k, "control-place", &place_label, "T", 15.0, shown, icon(k, 30.0, canvas(place).size(14.0, 14.0)))
+                .on_press_tx(act(pick_place)),
         )
         .child(
-            icon(k, "control-keys", "Keys", "?", 30.0, text("?").font(TextStyle::new(13.0, 620.0)).color(c))
+            docked(k, "control-keys", "Keys", "?", 15.0, shown, icon(k, 30.0, keys))
                 .on_press_tx(act(|s, _| s.keys_open = true)),
         );
-    let r = if shown { r } else { r.inert() };
     // The corner itself takes the pointer: resting there keeps the controls out, and a click
-    // aimed at a fading control never reaches the sky behind it.
-    el().key("dock")
+    // aimed at a fading control never reaches the sky behind it. While they are hidden a cover
+    // over them takes the click instead.
+    let dock = el()
+        .key("dock")
+        .role("none")
         .pin(None, None, Some(0.0), Some(0.0))
         .size(DOCK.0, DOCK.1)
-        .a11y_hidden()
         .on_drag(|_: &mut State, _, _| {})
         .on_hover_change(|s: &mut State, inside, tx: &mut Tx| {
             s.over_controls = inside;
@@ -150,7 +144,17 @@ pub fn view(s: &State, k: Ink) -> El {
                 tx.wake_at(s.controls_until);
             }
         })
-        .child(r.pin(None, None, Some(14.0), Some(14.0)))
+        .child(r.pin(None, None, Some(14.0), Some(14.0)));
+    if shown {
+        dock
+    } else {
+        dock.child(
+            el().key("dock-cover")
+                .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
+                .on_drag(|_: &mut State, _, _| {})
+                .a11y_hidden(),
+        )
+    }
 }
 
 /// The places by name, in a menu from the place control.

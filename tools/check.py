@@ -161,8 +161,18 @@ CHECKS = [
         "running",
         lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time left",
     ),
-    ("the hover controls show while the pointer moves", "hover", "shown", lambda t: opacity(t, "controls") == 1.0),
-    ("and fade once it rests, even with the clock stopped", "hover", "rested", lambda t: opacity(t, "controls") == 0.0),
+    (
+        "the hover controls show while the pointer moves",
+        "hover",
+        "shown",
+        lambda t: opacity(t, "control-play-look") == 1.0,
+    ),
+    (
+        "and fade once it rests, even with the clock stopped, staying where VoiceOver finds them",
+        "hover",
+        "rested",
+        lambda t: opacity(t, "control-play-look") == 0.0 and t["@a11y"].get("control-play", {}).get("name") == "Start",
+    ),
     (
         "a label is typed without starting the clock, and arrows set one minute",
         "cycle",
@@ -343,7 +353,12 @@ CHECKS = [
         lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
-    ("the controls stay while the pointer rests on them", "dock", "resting", lambda t: opacity(t, "controls") == 1.0),
+    (
+        "the controls stay while the pointer rests on them",
+        "dock",
+        "resting",
+        lambda t: opacity(t, "control-play-look") == 1.0,
+    ),
     (
         "a click in their corner, off any control, never reaches the sky",
         "dock",

@@ -33,12 +33,18 @@ pub fn line(k: Ink, s: impl Into<String>, size: f32, weight: f32, alpha: f32) ->
 
 /// A small text button on the scene, with a keyboard ring, at least `HIT` tall.
 pub fn button(k: Ink, key: &str, label: &str, help: &str) -> El {
-    row()
+    pill(k, label)
         .key(key.to_string())
         .role("button")
         .label(label.to_string())
         .focusable(true)
         .help(help.to_string())
+        .focus_ring(1.5, 1.5, k.text.alpha(0.9))
+}
+
+/// How a small text button looks.
+pub fn pill(k: Ink, label: &str) -> El {
+    row()
         .min_h(HIT)
         .center_y()
         .px(10.0)
@@ -46,7 +52,6 @@ pub fn button(k: Ink, key: &str, label: &str, help: &str) -> El {
         .fill(k.shade.alpha(0.5))
         .border(1.0, k.text.alpha(0.42))
         .hover(k.text.alpha(0.12))
-        .focus_ring(1.5, 1.5, k.text.alpha(0.9))
         .child(line(k, label, SMALL, 540.0, BRIGHT))
 }
 
@@ -55,7 +60,7 @@ pub fn button(k: Ink, key: &str, label: &str, help: &str) -> El {
 pub fn scrim(k: Ink) -> El {
     let shade = k.shade;
     let a = if k == Ink::dark() { 0.4 } else { 1.0 };
-    el().key("scrim").absolute(0.0, H - 280.0).size(350.0, 280.0).radial_gradient(
+    el().key("scrim").absolute(0.0, H - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
         [0.05, 0.85],
         [340.0, 225.0],
         [
