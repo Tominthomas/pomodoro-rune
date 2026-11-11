@@ -1,0 +1,6 @@
+# The UI is built from long builder chains (el().key(..).size(..).fill(..)), which read best kept
+# on one line when they fit. 120 columns still fits GitHub's code view, and "Max" lets every
+# construct (chains, calls, struct literals) use the full width instead of rustfmt's narrower
+# per-construct defaults. Stable options only, so the pinned toolchain needs no nightly.
+max_width = 120
+use_small_heuristics = "Max"

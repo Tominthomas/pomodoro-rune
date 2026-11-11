@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      # Installs the toolchain rust-toolchain.toml pins, with clippy and rustfmt.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: pipx install ruff==0.17.4
+      - run: tools/ci.sh
+        env:
+          # Hosted runners are VMs whose paravirtual GPU has not been shown to render the app
+          # headless, so fmt, clippy, tests and ruff run here and the render checks run locally.
+          SKIP_HEADLESS: 1

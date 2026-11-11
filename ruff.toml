@@ -1,0 +1,7 @@
+# The headless tools in tools/. Same 120 columns as rustfmt.toml.
+line-length = 120
+target-version = "py310"
+
+[lint]
+# pycodestyle, pyflakes, isort, bugbear, pyupgrade, simplify, and ruff's own checks.
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF"]
