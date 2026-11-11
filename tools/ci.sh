@@ -9,8 +9,31 @@ step() { printf '\n==> %s\n' "$*"; }
 
 command -v ruff >/dev/null 2>&1 || ruff() { pipx run ruff "$@"; }
 
+# CI installs the pinned linters in .github/workflows/ci.yml. Locally, put them on PATH or in
+# target/tools/bin. A missing one is skipped with a message, except in CI, where it fails.
+PATH="$PWD/target/tools/bin:$PATH"
+has() {
+  command -v "$1" >/dev/null 2>&1 && return 0
+  if [ "${CI:-}" = true ]; then
+    echo "$1 is not installed" >&2
+    exit 1
+  fi
+  step "$1 SKIPPED (not installed; see .github/workflows/ci.yml for the version)"
+  return 1
+}
+
 step "cargo fmt --check"
 cargo fmt --check
+if has typos; then
+  step "typos"
+  typos --hidden --exclude .git
+fi
+if has taplo; then
+  step "taplo"
+  toml=$(git ls-files '*.toml')
+  RUST_LOG=warn taplo fmt --check $toml
+  RUST_LOG=warn taplo check $toml
+fi
 step "cargo clippy"
 cargo clippy --locked --all-targets --release -- -D warnings
 step "cargo doc"
