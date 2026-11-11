@@ -1,0 +1,19 @@
+{
+ "events": [
+  {
+   "t": 30.0,
+   "type": "mark",
+   "name": "half"
+  },
+  {
+   "t": 60.0,
+   "type": "mark",
+   "name": "zero"
+  },
+  {
+   "t": 70.0,
+   "type": "mark",
+   "name": "end"
+  }
+ ]
+}

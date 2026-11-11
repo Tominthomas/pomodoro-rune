@@ -1,0 +1,429 @@
+{
+ "events": [
+  {
+   "t": 0.1,
+   "type": "key",
+   "name": "l"
+  },
+  {
+   "t": 0.2,
+   "type": "type",
+   "text": "Reading & notes"
+  },
+  {
+   "t": 0.7,
+   "type": "key",
+   "name": "Enter"
+  },
+  {
+   "t": 1.0,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.02,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.04,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.06,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.08,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.1,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.12,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.14,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.16,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.18,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.2,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.22,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.24,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.26,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.28,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.3,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.32,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.34,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.36,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.38,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.4,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.42,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.44,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.46,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 1.6,
+   "type": "mark",
+   "name": "wound"
+  },
+  {
+   "t": 2.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 61.5,
+   "type": "mark",
+   "name": "b1-last"
+  },
+  {
+   "t": 63.0,
+   "type": "mark",
+   "name": "b1-bell"
+  },
+  {
+   "t": 66.5,
+   "type": "mark",
+   "name": "b1-break"
+  },
+  {
+   "t": 67.0,
+   "type": "key",
+   "name": "1"
+  },
+  {
+   "t": 67.3,
+   "type": "mark",
+   "name": "b1-rated"
+  },
+  {
+   "t": 68.0,
+   "type": "key",
+   "name": "s"
+  },
+  {
+   "t": 68.3,
+   "type": "mark",
+   "name": "wound-2"
+  },
+  {
+   "t": 69.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 83.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 83.5,
+   "type": "mark",
+   "name": "b2-paused"
+  },
+  {
+   "t": 85.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 130.5,
+   "type": "mark",
+   "name": "b2-last"
+  },
+  {
+   "t": 132.0,
+   "type": "mark",
+   "name": "b2-bell"
+  },
+  {
+   "t": 135.5,
+   "type": "mark",
+   "name": "b2-break"
+  },
+  {
+   "t": 136.0,
+   "type": "key",
+   "name": "s"
+  },
+  {
+   "t": 136.3,
+   "type": "mark",
+   "name": "wound-3"
+  },
+  {
+   "t": 137.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 182.0,
+   "type": "key",
+   "name": "s"
+  },
+  {
+   "t": 183.0,
+   "type": "mark",
+   "name": "b3-letgo"
+  },
+  {
+   "t": 181.5,
+   "type": "mark",
+   "name": "b3-last"
+  },
+  {
+   "t": 183.0,
+   "type": "mark",
+   "name": "b3-bell"
+  },
+  {
+   "t": 186.5,
+   "type": "mark",
+   "name": "b3-break"
+  },
+  {
+   "t": 187.0,
+   "type": "key",
+   "name": "s"
+  },
+  {
+   "t": 187.3,
+   "type": "mark",
+   "name": "wound-4"
+  },
+  {
+   "t": 188.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 247.5,
+   "type": "mark",
+   "name": "b4-last"
+  },
+  {
+   "t": 249.0,
+   "type": "mark",
+   "name": "b4-bell"
+  },
+  {
+   "t": 252.5,
+   "type": "mark",
+   "name": "b4-break"
+  },
+  {
+   "t": 253.0,
+   "type": "key",
+   "name": "s"
+  },
+  {
+   "t": 253.3,
+   "type": "mark",
+   "name": "wound-5"
+  },
+  {
+   "t": 254.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 313.5,
+   "type": "mark",
+   "name": "b5-last"
+  },
+  {
+   "t": 315.0,
+   "type": "mark",
+   "name": "b5-bell"
+  },
+  {
+   "t": 318.5,
+   "type": "mark",
+   "name": "b5-break"
+  },
+  {
+   "t": 319.0,
+   "type": "mark",
+   "name": "long"
+  },
+  {
+   "t": 319.2,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.22,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.24,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.26,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.28,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.3,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.32,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.34,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.36,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.38,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.4,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.42,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.44,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.46,
+   "type": "key",
+   "name": "Down"
+  },
+  {
+   "t": 319.6,
+   "type": "mark",
+   "name": "long-set"
+  },
+  {
+   "t": 320.0,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 321.0,
+   "type": "mark",
+   "name": "night-early"
+  },
+  {
+   "t": 360.0,
+   "type": "mark",
+   "name": "rising"
+  },
+  {
+   "t": 361.0,
+   "type": "key",
+   "name": "h"
+  },
+  {
+   "t": 362.0,
+   "type": "mark",
+   "name": "today"
+  },
+  {
+   "t": 363.0,
+   "type": "mark",
+   "name": "end"
+  }
+ ]
+}

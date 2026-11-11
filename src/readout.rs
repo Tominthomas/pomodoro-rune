@@ -1,0 +1,347 @@
+//! The readout, bottom left, small and still: what the block is for, the time, one quiet line
+//! about what the scene is doing, and whatever is on offer right now: setting the length,
+//! saying how a block felt, taking back a let go, resuming. It sits on a soft local shade, so
+//! its small text reads in every place, light or dark.
+
+use rune::shape::{LineCap, Shape};
+use rune::tok::TextStyle;
+use rune::{El, Key, KeyEvent, Transition, Tx, canvas, col, el, row, text, text_input};
+
+use crate::log::{self, Felt};
+use crate::theme::{H, Ink, W};
+use crate::timer::{Clock, Event, Phase};
+use crate::{Asking, State, carry, edit_label, finish_label, guarded, open_today, rate};
+
+/// Text on the scene: the main line, and the quieter ones under it. Both keep 4.5:1 on the
+/// shade behind the readout.
+pub const BRIGHT: f32 = 0.97;
+pub const QUIET: f32 = 0.86;
+/// The type scale: the time, what the block is for, and everything quieter.
+pub const DISPLAY: f32 = 30.0;
+pub const LEAD: f32 = 13.0;
+pub const SMALL: f32 = 11.5;
+/// Where the readout's first line sits.
+const TOP: f32 = H - 184.0;
+/// How wide a label may run before it's cut with an ellipsis.
+const LABEL_W: f32 = 230.0;
+/// The smallest a target is under the pointer, whatever it draws.
+pub const HIT: f32 = 24.0;
+
+pub fn line(k: Ink, s: impl Into<String>, size: f32, weight: f32, alpha: f32) -> El {
+    text(s.into()).font(TextStyle::new(size, weight)).color(k.text.alpha(alpha))
+}
+
+/// A small text button on the scene, with a keyboard ring, at least `HIT` tall.
+pub fn button(k: Ink, key: &str, label: &str, help: &str) -> El {
+    row()
+        .key(key.to_string())
+        .role("button")
+        .label(label.to_string())
+        .focusable(true)
+        .help(help.to_string())
+        .min_h(HIT)
+        .center_y()
+        .px(10.0)
+        .radius(12.0)
+        .fill(k.shade.alpha(0.5))
+        .border(1.0, k.text.alpha(0.42))
+        .hover(k.text.alpha(0.12))
+        .focus_ring(1.5, 1.5, k.text.alpha(0.9))
+        .child(line(k, label, SMALL, 540.0, BRIGHT))
+}
+
+/// The soft shade the readout sits on, darkest at the window's corner. Dark ink already reads
+/// on pale water, so its light shade stays faint: enough to quiet the texture, never a fog.
+pub fn scrim(k: Ink) -> El {
+    let shade = k.shade;
+    let a = if k == Ink::dark() { 0.4 } else { 1.0 };
+    el().key("scrim").absolute(0.0, H - 280.0).size(350.0, 280.0).radial_gradient(
+        [0.05, 0.85],
+        [340.0, 225.0],
+        [
+            (0.0, shade.alpha(0.62 * a)),
+            (0.5, shade.alpha(0.5 * a)),
+            (0.78, shade.alpha(0.2 * a)),
+            (1.0, shade.alpha(0.0)),
+        ],
+    )
+}
+
+fn mmss(secs: u32) -> String {
+    format!("{:02}:{:02}", secs / 60, secs % 60)
+}
+
+/// The time left as `VoiceOver` reads it: "24 minutes 58 seconds".
+pub fn spoken(secs: u32) -> String {
+    let unit = |n: u32, one: &str| format!("{n} {one}{}", if n == 1 { "" } else { "s" });
+    match (secs / 60, secs % 60) {
+        (0, s) => unit(s, "second"),
+        (m, 0) => unit(m, "minute"),
+        (m, s) => format!("{} {}", unit(m, "minute"), unit(s, "second")),
+    }
+}
+
+/// The line under the time: what the scene is doing, and what to do next.
+pub fn phase_line(s: &State) -> &'static str {
+    let t = &s.timer;
+    match (t.phase, &t.clock) {
+        (Phase::Focus, Clock::Ringing { kept: true, .. }) => "a lantern for that one",
+        (Phase::Focus, Clock::Ringing { .. }) => "let go; the minutes still count",
+        (_, Clock::Paused { .. }) => "paused · space to resume",
+        (_, Clock::Scrubbing { .. }) => "release to set the length",
+        (Phase::Focus, Clock::Wound) => "focus · space to begin",
+        (Phase::Focus, _) => "focus",
+        (_, Clock::Ringing { .. }) => "the break is over",
+        (Phase::Short, Clock::Wound) => "rest · space when you're ready",
+        (Phase::Short, _) => "rest",
+        (Phase::Long, Clock::Wound) => "long rest · space when you're ready",
+        (Phase::Long, _) => "long rest, four lanterns up",
+    }
+}
+
+pub fn view(s: &State, k: Ink) -> El {
+    let t = &s.timer;
+    let resting = t.phase != Phase::Focus;
+    // Anchored at its top, so the time holds still whatever is offered under it. The top line
+    // and the phase line keep one key each, so a change replaces the words in place.
+    let mut out = col().key("readout").absolute(24.0, TOP).w(W - 48.0).gap(3.0).items_start();
+    if resting {
+        // During a break the top line is about the block just done, not the next one. It keeps
+        // the label's shape, so the words change in place and never cross-fade over each other.
+        let after =
+            s.study.log.blocks.last().and_then(|b| b.label.clone()).map_or(String::new(), |l| format!("after {l}"));
+        out = out.child(
+            row()
+                .key("top")
+                .h(17.0)
+                .max_w(LABEL_W)
+                .child(line(k, after, LEAD, 480.0, QUIET).key("top-text").max_w(LABEL_W).truncate()),
+        );
+    } else {
+        out = out.child(label(s, k));
+    }
+    out = out.child(time_row(s, k)).child(line(k, phase_line(s), SMALL, 460.0, QUIET).key("phase"));
+    let mut offers = col().key("offers").gap(6.0).items_start();
+    if s.hint && s.study.log.blocks.is_empty() && t.phase == Phase::Focus && t.clock == Clock::Wound {
+        offers = offers.child(
+            row()
+                .key("hint")
+                .gap(8.0)
+                .center_y()
+                .child(line(k, "drag the sun or press ↑ ↓ to set the length", 11.0, 480.0, BRIGHT))
+                .child(
+                    button(k, "hint-dismiss", "got it", "Hide this hint")
+                        .on_press_tx(guarded(|s, _| s.put_hint_away())),
+                ),
+        );
+    }
+    if t.can_undo(s.now) {
+        let undo = row()
+            .key("undo")
+            .role("button")
+            .label("Undo let go")
+            .focusable(true)
+            .help("Bring the block back  U")
+            .min_h(28.0)
+            .center_y()
+            .gap(8.0)
+            .px(12.0)
+            .radius(14.0)
+            .fill(k.text.alpha(0.92))
+            .hover(k.shade.alpha(0.1))
+            .focus_ring(1.5, 1.5, k.text.alpha(0.9))
+            .child(line(Ink { text: k.shade, shade: k.text }, "Undo let go", 12.0, 600.0, 1.0))
+            .child(line(Ink { text: k.shade, shade: k.text }, "U", 11.0, 500.0, 0.8))
+            .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx)));
+        offers = offers.child(undo);
+    }
+    if matches!(t.clock, Clock::Paused { .. }) {
+        offers = offers.child(
+            button(k, "resume", "Resume", "Resume  Space")
+                .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
+        );
+    }
+    if let Some(r) = reflection(s, k) {
+        offers = offers.child(r);
+    }
+    if let Some(why) = &s.save_error {
+        offers = offers.child(line(k, format!("not saved: {why}"), 10.5, 460.0, QUIET).key("save-error"));
+    }
+    out.child(el().h(3.0)).child(offers)
+}
+
+/// What the next block is for: a field while it's being named.
+fn label(s: &State, k: Ink) -> El {
+    if s.editing {
+        return text_input(&s.label, TextStyle::new(LEAD, 480.0))
+            .key("label-field")
+            .single_line()
+            .w(LABEL_W)
+            .color(k.text.alpha(BRIGHT))
+            .placeholder("what's this block for?", k.text.alpha(0.7))
+            .on_edit(|s: &mut State| &mut s.label)
+            .on_input_key(|s: &mut State, e: &KeyEvent, tx: &mut Tx| {
+                if e.key != Key::Escape {
+                    return false;
+                }
+                finish_label(s, false, tx);
+                true
+            })
+            .on_submit(|s: &mut State, tx: &mut Tx| finish_label(s, true, tx));
+    }
+    let named = s.label();
+    // Unnamed, the offer to name the block shows only while the controls do.
+    let shy = named.is_none() && !(s.controls_shown() && s.timer.clock == Clock::Wound);
+    let alpha = if named.is_some() {
+        BRIGHT
+    } else if shy {
+        0.0
+    } else {
+        QUIET
+    };
+    let full = named.clone().unwrap_or_else(|| "+ name this block".into());
+    let el = row()
+        .key("top")
+        .h(17.0)
+        .max_w(LABEL_W)
+        .role("button")
+        .label(format!("What this block is for: {full}"))
+        .help(format!("{full}  L"))
+        .focus_ring(1.5, 2.0, k.text.alpha(0.9))
+        .on_press_tx(guarded(edit_label))
+        .child(line(k, full, LEAD, 480.0, alpha).key("top-text").max_w(LABEL_W).truncate());
+    if shy { el.inert() } else { el.focusable(true) }
+}
+
+/// The time, with a pause mark while held and, while it waits and the controls are out, a
+/// minute either way. Pressed, it opens Today; under the pointer it says so.
+fn time_row(s: &State, k: Ink) -> El {
+    let t = &s.timer;
+    let shown = match (&t.clock, s.study.log.blocks.last()) {
+        (Clock::Ringing { .. }, Some(b)) if t.phase == Phase::Focus => log::duration(b.focused),
+        (Clock::Scrubbing { .. }, _) => format!("{} min", t.length() / 60),
+        _ => mmss(t.shown(s.now)),
+    };
+    let display =
+        TextStyle { features: "'tnum' 1", variations: "'opsz' 32", tracking: -0.3, ..TextStyle::new(DISPLAY, 300.0) };
+    let time = text(shown)
+        .key("time")
+        .font(display)
+        .color(k.text.alpha(BRIGHT))
+        .role("timer")
+        .label("Time left")
+        .a11y_value(spoken(t.shown(s.now)));
+    let today = row()
+        .key("time-today")
+        .hover_group()
+        .role("button")
+        .label("Today")
+        .help("Today and the last four weeks  H")
+        .gap(6.0)
+        .items_end()
+        .on_press_tx(guarded(|s, _| open_today(s, true)))
+        .child(time)
+        .child(line(k, "Today ›", 11.0, 520.0, QUIET).group_opacity(0.0, 1.0).pb(6.0));
+    let mut r = row().gap(8.0).center_y();
+    if matches!(t.clock, Clock::Paused { .. }) {
+        let c = k.text.alpha(BRIGHT);
+        let bars = Shape::new().line([3.0, 2.5], [3.0, 11.5], 2.0, LineCap::Round, c).line(
+            [8.0, 2.5],
+            [8.0, 11.5],
+            2.0,
+            LineCap::Round,
+            c,
+        );
+        r = r.child(canvas(bars).key("paused-mark").size(11.0, 14.0));
+    }
+    r = r.child(today);
+    if t.clock == Clock::Wound && s.controls_shown() {
+        r = r.child(el().w(6.0)).child(stepper(k, "shorter", "−", "A minute shorter  ↓", -1)).child(stepper(
+            k,
+            "longer",
+            "+",
+            "A minute longer  ↑",
+            1,
+        ));
+    }
+    r
+}
+
+fn stepper(k: Ink, key: &'static str, glyph: &str, help: &str, minutes: i32) -> El {
+    el().key(key)
+        .size(HIT, HIT)
+        .center()
+        .role("button")
+        .label(help.split("  ").next().unwrap_or(help).to_string())
+        .help(help.to_string())
+        .focusable(true)
+        .focus_ring(1.5, 0.0, k.text.alpha(0.9))
+        .hover_group()
+        .radius(12.0)
+        .on_press_tx(guarded(move |s, tx| carry(s, Event::Nudge { minutes }, tx)))
+        .child(
+            el().size(22.0, 22.0)
+                .radius(11.0)
+                .center()
+                .fill(k.shade.alpha(0.55))
+                .border(1.0, k.text.alpha(0.35))
+                .group_color(k.text.alpha(0.2))
+                .child(line(k, glyph, 14.0, 500.0, BRIGHT)),
+        )
+}
+
+/// How did that block feel? Optional: three words, offered from the bell. A word given is
+/// noted for a moment and the question folds away; left unanswered, it fades into the break
+/// and the lantern stays unanswered.
+fn reflection(s: &State, k: Ink) -> Option<El> {
+    let card = col().key("reflect").gap(6.0).transition(Transition::opacity());
+    match s.asking() {
+        Asking::Hidden => None,
+        Asking::Noted(felt) => Some(
+            card.child(line(k, format!("Felt {}. Noted.", felt.word()), SMALL, 480.0, QUIET).key("reflect-question")),
+        ),
+        Asking::Open => {
+            let words = Felt::ALL.iter().enumerate().fold(
+                row().key("rating").gap(6.0).center_y().focus_group(),
+                |r, (i, &felt)| {
+                    r.child(
+                        row()
+                            .key(format!("felt-{}", felt.word()))
+                            .min_h(HIT)
+                            .center_y()
+                            .px(10.0)
+                            .radius(12.0)
+                            .fill(k.shade.alpha(0.5))
+                            .border(1.0, k.text.alpha(0.45))
+                            .hover(k.text.alpha(0.14))
+                            .role("radio")
+                            .label(felt.word())
+                            .checked(false)
+                            .focusable(true)
+                            .help(format!("{}  {}", felt.word(), i + 1))
+                            .focus_ring(1.5, 1.5, k.text.alpha(0.9))
+                            .on_press_tx(guarded(move |s, tx| rate(s, felt, tx)))
+                            .child(text(felt.word()).font(TextStyle::new(11.5, 540.0)).color(k.text.alpha(BRIGHT))),
+                    )
+                },
+            );
+            let dismiss = el()
+                .key("reflect-dismiss")
+                .size(HIT, HIT)
+                .radius(12.0)
+                .center()
+                .role("button")
+                .label("Not now")
+                .help("Not now  Esc")
+                .hover(k.text.alpha(0.14))
+                .focusable(true)
+                .focus_ring(1.5, 0.0, k.text.alpha(0.9))
+                .child(line(k, "×", 15.0, 500.0, QUIET))
+                .on_press_tx(guarded(|s, _| s.reflect = None));
+            Some(
+                card.child(line(k, "How did that block feel? Optional.", SMALL, 480.0, QUIET).key("reflect-question"))
+                    .child(words.child(dismiss)),
+            )
+        }
+    }
+}

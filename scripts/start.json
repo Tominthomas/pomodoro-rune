@@ -1,0 +1,36 @@
+{
+ "events": [
+  {
+   "t": 0.3,
+   "type": "tap",
+   "x": 190.0,
+   "y": 200.0
+  },
+  {
+   "t": 2.4,
+   "type": "mark",
+   "name": "running"
+  },
+  {
+   "t": 2.5,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 3.2,
+   "type": "mark",
+   "name": "paused"
+  },
+  {
+   "t": 3.6,
+   "type": "tap",
+   "x": 190.0,
+   "y": 200.0
+  },
+  {
+   "t": 5.0,
+   "type": "mark",
+   "name": "resumed"
+  }
+ ]
+}

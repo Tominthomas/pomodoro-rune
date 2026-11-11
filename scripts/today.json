@@ -1,0 +1,80 @@
+{
+ "events": [
+  {
+   "t": 1.0,
+   "type": "tap",
+   "x": 200.0,
+   "y": 40.0
+  },
+  {
+   "t": 2.0,
+   "type": "mark",
+   "name": "clicked"
+  },
+  {
+   "t": 2.5,
+   "type": "tap",
+   "key": "day-lantern-0"
+  },
+  {
+   "t": 3.5,
+   "type": "mark",
+   "name": "detail"
+  },
+  {
+   "t": 4.0,
+   "type": "tap",
+   "key": "day-lantern-1"
+  },
+  {
+   "t": 4.8,
+   "type": "mark",
+   "name": "unrated"
+  },
+  {
+   "t": 5.0,
+   "type": "tap",
+   "key": "detail-felt-steady"
+  },
+  {
+   "t": 5.8,
+   "type": "mark",
+   "name": "felt-given"
+  },
+  {
+   "t": 6.0,
+   "type": "tap",
+   "key": "detail-felt-steady"
+  },
+  {
+   "t": 6.8,
+   "type": "mark",
+   "name": "felt-cleared"
+  },
+  {
+   "t": 7.0,
+   "type": "tap",
+   "key": "day-20767"
+  },
+  {
+   "t": 8.0,
+   "type": "mark",
+   "name": "yesterday"
+  },
+  {
+   "t": 8.5,
+   "type": "tap",
+   "key": "back-to-today"
+  },
+  {
+   "t": 9.5,
+   "type": "mark",
+   "name": "back"
+  },
+  {
+   "t": 10.0,
+   "type": "mark",
+   "name": "end"
+  }
+ ]
+}

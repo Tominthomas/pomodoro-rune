@@ -1,0 +1,34 @@
+{
+ "events": [
+  {
+   "focus": false,
+   "t": 0.2
+  },
+  {
+   "focus": true,
+   "t": 1.0
+  },
+  {
+   "t": 1.05,
+   "type": "tap",
+   "x": 190.0,
+   "y": 200.0
+  },
+  {
+   "t": 2.0,
+   "type": "mark",
+   "name": "activated"
+  },
+  {
+   "t": 2.5,
+   "type": "tap",
+   "x": 190.0,
+   "y": 200.0
+  },
+  {
+   "t": 4.0,
+   "type": "mark",
+   "name": "started"
+  }
+ ]
+}

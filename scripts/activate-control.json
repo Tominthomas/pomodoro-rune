@@ -1,0 +1,38 @@
+{
+ "events": [
+  {
+   "t": 0.1,
+   "type": "move",
+   "x": 300,
+   "y": 510
+  },
+  {
+   "focus": false,
+   "t": 0.4
+  },
+  {
+   "focus": true,
+   "t": 1.0
+  },
+  {
+   "t": 1.05,
+   "type": "tap",
+   "key": "control-play"
+  },
+  {
+   "t": 2.4,
+   "type": "mark",
+   "name": "activated"
+  },
+  {
+   "t": 3.0,
+   "type": "tap",
+   "key": "control-play"
+  },
+  {
+   "t": 4.0,
+   "type": "mark",
+   "name": "started"
+  }
+ ]
+}

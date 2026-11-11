@@ -1,0 +1,52 @@
+[package]
+name = "pomodoro-rune"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+description = "A sunset pomodoro timer for macOS, built with Rune"
+repository = "https://github.com/Tominthomas/pomodoro-rune"
+readme = "README.md"
+license = "MIT"
+keywords = ["pomodoro", "timer", "macos", "productivity", "rune"]
+categories = ["gui"]
+
+[[bin]]
+name = "pomodoro"
+path = "src/main.rs"
+
+[dependencies]
+rune = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
+rune-notify = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
+
+[profile.dev]
+debug = "line-tables-only"
+
+[lints.rust]
+unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Panicking shortcuts and leftovers stay out of the app; tests may unwrap (see clippy.toml).
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+# A lint is silenced only with #[expect(lint, reason = "...")], which also fails once it is stale.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Pedantic lints that fight a drawing app: colours are 0xRRGGBB hex, geometry is f32 that lands
+# on pixels and bytes on purpose, and x/y/r/g/b are the domain's own names.
+unreadable_literal = "allow"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+many_single_char_names = "allow"

@@ -1,0 +1,53 @@
+{
+ "events": [
+  {
+   "t": 0.3,
+   "type": "move",
+   "x": 300,
+   "y": 515
+  },
+  {
+   "t": 5.0,
+   "type": "mark",
+   "name": "resting"
+  },
+  {
+   "t": 5.5,
+   "type": "tap",
+   "x": 150,
+   "y": 520
+  },
+  {
+   "t": 6.5,
+   "type": "mark",
+   "name": "corner-click"
+  },
+  {
+   "t": 7.0,
+   "type": "move",
+   "x": 190,
+   "y": 200
+  },
+  {
+   "t": 7.1,
+   "type": "move",
+   "x": 190,
+   "y": 202
+  },
+  {
+   "t": 9.5,
+   "type": "mark",
+   "name": "faded"
+  },
+  {
+   "t": 9.6,
+   "type": "tap",
+   "key": "control-play"
+  },
+  {
+   "t": 10.5,
+   "type": "mark",
+   "name": "faded-click"
+  }
+ ]
+}
