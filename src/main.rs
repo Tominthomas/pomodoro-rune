@@ -6,6 +6,7 @@
 mod controls;
 mod demo;
 mod drawing;
+mod history;
 mod lantern;
 mod log;
 mod readout;
