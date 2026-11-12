@@ -231,7 +231,12 @@ fn space_starts_pauses_and_resumes_the_sunset() {
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
     app.space();
     app.wait(5.0);
-    assert_eq!((app.time(), app.phase()), ("24:58".into(), "paused · space to resume".into()), "held where it was");
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("24:58".into(), "the sky waits · space to resume".into()),
+        "held where it was"
+    );
+    assert_eq!(app.read("time-unit").as_deref(), Some("paused"), "and says so beside the time");
     app.space();
     app.wait(1.0);
     assert_eq!((app.time(), app.phase()), ("24:57".into(), "focus".into()));
@@ -245,7 +250,7 @@ fn a_tap_on_the_sky_starts_pauses_and_resumes_it_too() {
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
     app.tap("sky");
     app.wait(3.0);
-    assert_eq!(app.phase(), "paused · space to resume");
+    assert_eq!(app.phase(), "the sky waits · space to resume");
     app.tap("sky");
     app.wait(1.0);
     assert_eq!((app.time(), app.phase()), ("24:57".into(), "focus".into()));
@@ -397,7 +402,7 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.rt.update(|s, tx| on_focus(s, false, tx));
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.space();
-    assert_eq!(app.phase(), "paused · space to resume", "keys always act");
+    assert_eq!(app.phase(), "the sky waits · space to resume", "keys always act");
 }
 
 #[test]
@@ -564,7 +569,7 @@ fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
     );
     app.voiceover_press("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "paused · space to resume");
+    assert_eq!(app.phase(), "the sky waits · space to resume");
     assert_eq!(control(&app, "control-play"), "Resume");
 }
 

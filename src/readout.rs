@@ -3,9 +3,8 @@
 //! saying how a block felt, taking back a let go, resuming. It sits on a soft local shade, so
 //! its small text reads in every place, light or dark.
 
-use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
-use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, canvas, col, el, row, text, text_input};
+use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, col, el, row, text, text_input};
 
 use crate::log::{self, Felt};
 use crate::theme::{H, Ink, W};
@@ -100,7 +99,7 @@ pub fn phase_line(s: &State) -> &'static str {
     match (t.phase, &t.clock) {
         (Phase::Focus, Clock::Ringing { kept: true, .. }) => "a lantern for that one",
         (Phase::Focus, Clock::Ringing { .. }) => "let go; the minutes still count",
-        (_, Clock::Paused { .. }) => "paused · space to resume",
+        (_, Clock::Paused { .. }) => "the sky waits · space to resume",
         (_, Clock::Scrubbing { .. }) => "release to set the length",
         (Phase::Focus, Clock::Wound) if s.teaching() => "focus · click the sky or press space to begin",
         (Phase::Focus, Clock::Wound) => "focus · space to begin",
@@ -248,7 +247,8 @@ fn label(s: &State, k: Ink) -> El {
     if shy { el.inert() } else { el.focusable(true) }
 }
 
-/// The time, with a pause mark while held and, while it waits, a minute either way: drawn once
+/// The time, with what it is when that isn't plain: a block's minutes once it ends, or "paused"
+/// while it is held. While it waits, a minute either way sits beside it: drawn once
 /// the pointer or Tab calls the controls out, and always there for `VoiceOver`.
 fn time_row(s: &State, k: Ink) -> El {
     let t = &s.timer;
@@ -259,6 +259,9 @@ fn time_row(s: &State, k: Ink) -> El {
             (log::duration(b.focused), Some(unit), name, format!("{} {unit}", spoken_minutes(b.focused)))
         }
         (Clock::Scrubbing { .. }, _) => (format!("{} min", t.length() / 60), None, "Length", spoken(t.length())),
+        (Clock::Paused { .. }, _) => {
+            (mmss(t.shown(s.now)), Some("paused"), "Time remaining, paused", spoken(t.shown(s.now)))
+        }
         _ => (mmss(t.shown(s.now)), None, "Time remaining", spoken(t.shown(s.now))),
     };
     let display =
@@ -271,17 +274,6 @@ fn time_row(s: &State, k: Ink) -> El {
         time = time.child(line(k, unit, LEAD, 480.0, QUIET).key("time-unit").pb(6.0).a11y_hidden());
     }
     let mut r = row().gap(8.0).center_y();
-    if matches!(t.clock, Clock::Paused { .. }) {
-        let c = k.text.alpha(BRIGHT);
-        let bars = Shape::new().line([3.0, 2.5], [3.0, 11.5], 2.0, LineCap::Round, c).line(
-            [8.0, 2.5],
-            [8.0, 11.5],
-            2.0,
-            LineCap::Round,
-            c,
-        );
-        r = r.child(canvas(bars).key("paused-mark").size(11.0, 14.0));
-    }
     r = r.child(time);
     if t.clock == Clock::Wound {
         let shown = s.beckoned();

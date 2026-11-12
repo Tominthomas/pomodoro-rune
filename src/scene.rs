@@ -353,7 +353,7 @@ pub fn view(s: &Scene<'_>) -> El {
         el().key("veil")
             .a11y_hidden()
             .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
-            .fill(rgb(0x2a3058).alpha(if s.held { 0.14 } else { 0.0 })),
+            .fill(rgb(0x2a3058).alpha(if s.held { 0.2 } else { 0.0 })),
     );
     lanterns.into_iter().fold(stage, El::child)
 }

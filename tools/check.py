@@ -181,7 +181,7 @@ CHECKS = [
         "Space pauses it where it was",
         "start",
         "paused",
-        lambda t: text(t, "time") == "24:58" and phase(t) == "paused · space to resume",
+        lambda t: text(t, "time") == "24:58" and phase(t) == "the sky waits · space to resume",
     ),
     ("a tap goes on from there", "start", "resumed", lambda t: text(t, "time") == "24:57" and phase(t) == "focus"),
     (
@@ -246,7 +246,7 @@ CHECKS = [
         "wound-2",
         lambda t: text(t, "top-text") == "Reading & notes" and phase(t) == "focus · space to begin",
     ),
-    ("a second block pauses", "cycle", "b2-paused", lambda t: phase(t) == "paused · space to resume"),
+    ("a second block pauses", "cycle", "b2-paused", lambda t: phase(t) == "the sky waits · space to resume"),
     (
         "and still lights a lantern, with a knot for the pause",
         "cycle",
