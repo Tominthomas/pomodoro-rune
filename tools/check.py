@@ -536,6 +536,12 @@ CHECKS = [
     ),
     ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
+    (
+        "the keys card hides the scene behind it, which the veil around it still shows",
+        "keys",
+        "open",
+        lambda t: alpha(t["keys"]["fill"]) == 1.0 and alpha(t["keys-veil"]["fill"]) < 1.0,
+    ),
     ("the Timer menu starts the block", "menus", "running", lambda t: label(t, "control-play") == "Pause"),
     ("skips it", "menus", "skipped", lambda t: phase(t) == "Skipped before a minute. No lantern." and "undo" in t),
     ("and takes the skip back", "menus", "undone", lambda t: phase(t) == "focus" and "undo" not in t),
