@@ -1,6 +1,6 @@
 //! The readout, bottom left, small and still: what the block is for, the time, one quiet line
 //! about what the scene is doing, and whatever is on offer right now: setting the length,
-//! saying how a block felt, taking back a let go, resuming. It sits on a soft local shade, so
+//! saying how a block felt, taking back a skip, resuming. It sits on a soft local shade, so
 //! its small text reads in every place, light or dark.
 
 use rune::tok::TextStyle;
@@ -94,11 +94,15 @@ fn spoken_minutes(secs: u32) -> String {
 }
 
 /// The line under the time: what the scene is doing, and what to do next.
-pub fn phase_line(s: &State) -> &'static str {
+pub fn phase_line(s: &State) -> String {
     let t = &s.timer;
+    // A skip is explained for as long as it can be taken back: through its quiet ring and the
+    // break that waits after it.
+    if t.can_undo() {
+        return skipped_line(s.study.log.blocks.last().map_or(0, |b| b.focused));
+    }
     match (t.phase, &t.clock) {
-        (Phase::Focus, Clock::Ringing { kept: true, .. }) => "a lantern for that one",
-        (Phase::Focus, Clock::Ringing { .. }) => "let go; the minutes still count",
+        (Phase::Focus, Clock::Ringing { .. }) => "a lantern for that one",
         (_, Clock::Paused { .. }) => "the sky waits · space to resume",
         (_, Clock::Scrubbing { .. }) => "release to set the length",
         (Phase::Focus, Clock::Wound) if s.teaching() => "focus · click the sky or press space to begin",
@@ -109,6 +113,16 @@ pub fn phase_line(s: &State) -> &'static str {
         (Phase::Short, _) => "rest",
         (Phase::Long, Clock::Wound) => "long rest · space when you're ready",
         (Phase::Long, _) => "long rest, four lanterns up",
+    }
+    .into()
+}
+
+/// What a skip did with the block's `focused` seconds: they count, and light nothing.
+fn skipped_line(focused: u32) -> String {
+    match (focused + 30) / 60 {
+        0 => "Skipped before a minute. No lantern.".into(),
+        1 => "Skipped. 1 min still counts, no lantern.".into(),
+        _ => format!("Skipped. {} still count, no lantern.", log::duration(focused)),
     }
 }
 
@@ -179,7 +193,7 @@ pub fn view(s: &State, k: Ink) -> El {
         let undo = row()
             .key("undo")
             .role("button")
-            .label("Undo let go")
+            .label("Undo skip")
             .focusable(true)
             .help("Bring the block back  U")
             .min_h(28.0)
@@ -190,7 +204,7 @@ pub fn view(s: &State, k: Ink) -> El {
             .fill(k.text.alpha(0.92))
             .hover(k.shade.alpha(0.1))
             .focus_ring(1.5, 1.5, k.text.alpha(0.9))
-            .child(line(Ink { text: k.shade, shade: k.text }, "Undo let go", 12.0, 600.0, 1.0))
+            .child(line(Ink { text: k.shade, shade: k.text }, "Undo skip", 12.0, 600.0, 1.0))
             .child(line(Ink { text: k.shade, shade: k.text }, "U", 11.0, 500.0, 0.8))
             .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx)));
         offers = offers.child(undo);
@@ -280,8 +294,8 @@ fn time_row(s: &State, k: Ink) -> El {
     // A block that just ended shows what it came to, not the time left, and says which.
     let (shown, unit, name, said) = match (&t.clock, s.study.log.blocks.last()) {
         (Clock::Ringing { kept, .. }, Some(b)) if t.phase == Phase::Focus => {
-            let (unit, name) = if *kept { ("focused", "Block complete") } else { ("kept", "Block let go") };
-            (log::duration(b.focused), Some(unit), name, format!("{} {unit}", spoken_minutes(b.focused)))
+            let name = if *kept { "Block complete" } else { "Block skipped" };
+            (log::duration(b.focused), Some("focused"), name, format!("{} focused", spoken_minutes(b.focused)))
         }
         (Clock::Scrubbing { .. }, _) => (format!("{} min", t.length() / 60), None, "Length", spoken(t.length())),
         (Clock::Paused { .. }, _) => {

@@ -34,7 +34,7 @@ pub enum Sky {
     /// Focus: 0 at the start, 1 when the sun touches the sea. Just after a break, `dawn` brings
     /// the morning up out of the break's own sky.
     Sunset { progress: f32, dawn: Option<Dawn> },
-    /// A focus block just ended, `since` seconds ago. `kept` is false when it was let go
+    /// A focus block just ended, `since` seconds ago. `kept` is false when it was skipped
     /// at `from`: the sun sinks the rest of the way with no flash and no lantern. `long` when
     /// it rings in the long break, whose night it darkens toward.
     Bell { since: f32, kept: bool, from: f32, long: bool },
@@ -643,7 +643,7 @@ fn clouds(p: &Pal, sun_p: f32, dusk: f32, t: f32) -> El {
 }
 
 /// The bell's ripple, spreading from where the sun meets the water and scaled to it: two
-/// rings for a lantern, one faint ring for a block let go.
+/// rings for a lantern, one faint ring for a block skipped.
 fn ripple(sky: Sky, x: f32) -> Shape {
     let mut rip = Shape::new();
     let Sky::Bell { since, kept, .. } = sky else { return rip };

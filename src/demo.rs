@@ -28,9 +28,9 @@ fn seed(s: &mut State, day_offset: i64, blocks: &[Seeded<'_>]) {
     }
 }
 
-/// Today so far in the review renders: three lanterns this morning, one let go.
+/// Today so far in the review renders: four lanterns this morning, one block skipped.
 fn morning(s: &mut State) {
-    use Outcome::{Finished, LetGo};
+    use Outcome::{Finished, Skipped};
     seed(
         s,
         0,
@@ -38,18 +38,18 @@ fn morning(s: &mut State) {
             (9.4, Finished, &[], Some(Felt::Deep), "Reading & notes"),
             (10.0, Finished, &[0.4], None, "Reading & notes"),
             (10.55, Finished, &[], Some(Felt::Deep), "Problem set"),
-            (11.2, LetGo, &[0.2], None, "Problem set"),
+            (11.2, Skipped, &[0.2], None, "Problem set"),
             (13.6, Finished, &[0.3, 0.72], Some(Felt::Steady), "Problem set"),
         ],
     );
     s.label.replace_text("Problem set");
 }
 
-/// A long day: nineteen blocks from half past four, about every half hour, every fifth let go.
+/// A long day: nineteen blocks from half past four, about every half hour, every fifth skipped.
 fn busy(s: &mut State) {
     let blocks: Vec<Seeded<'_>> = (0..19)
         .map(|i| {
-            let outcome = if i % 5 == 3 { Outcome::LetGo } else { Outcome::Finished };
+            let outcome = if i % 5 == 3 { Outcome::Skipped } else { Outcome::Finished };
             (4.6 + i as f32 * 0.49, outcome, &[][..], None, ["Lecture notes", "Problem set", "Reading"][i % 3])
         })
         .collect();
@@ -129,11 +129,11 @@ pub const SCENES: &[(&str, Setup)] = &[
         asking(s, 0.0);
         s.timer.clock = Clock::Ringing { until: timer::RING, kept: true, from: 1.0 };
     }),
-    ("let-go", |s| {
+    ("skipped", |s| {
         morning(s);
         s.timer.done = 3;
         s.study.log.take_back();
-        seed(s, 0, &[(14.2, Outcome::LetGo, &[], None, "Problem set")]);
+        seed(s, 0, &[(14.2, Outcome::Skipped, &[], None, "Problem set")]);
         on_water(s, 3);
         s.timer.clock = Clock::Ringing { until: timer::RING, kept: false, from: 0.55 };
     }),

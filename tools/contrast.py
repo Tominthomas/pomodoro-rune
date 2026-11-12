@@ -26,7 +26,7 @@ SCENES = {
     "focus-late": "focus-late",
     "paused": "paused",
     "bell": "bell",
-    "let-go": "let-go",
+    "skipped": "skipped",
     "short": "short",
     "long": "long",
     "evening": "evening",

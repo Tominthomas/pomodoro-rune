@@ -37,7 +37,7 @@ Each feature file starts with an H1 title and one paragraph on the behavior a us
 
 - [Focus block](./focus-block.md) covers starting a block, naming it, the bell, the lantern and the reflection.
 - [Pause and resume](./pause-resume.md) covers Space, the sky, the play control, the Resume button and the knot on the lantern.
-- [Let go and undo](./let-go-undo.md) covers ending a block early, the ring it leaves, undo, and skipping a break.
+- [Skip and undo](./skip-undo.md) covers ending a block early, the ring it leaves, undo, and skipping a break.
 - [Set the length](./set-length.md) covers dragging the sun, the arrow keys, the hint and the long break's length.
 - [Long break](./long-break.md) covers the fourth lantern, the night, the lanterns rising and dawn.
 - [Today and history](./today-history.md) covers Today's numbers, block detail, feelings, renaming and past days.

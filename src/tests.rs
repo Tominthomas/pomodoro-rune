@@ -322,13 +322,13 @@ fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
 }
 
 #[test]
-fn s_lets_a_block_go_and_u_takes_it_back_so_it_counts_once_finished() {
+fn s_skips_a_block_and_u_takes_it_back_so_it_counts_once_finished() {
     let mut app = App::new();
     app.one_minute();
     app.space();
     app.wait(20.0);
     app.char("s");
-    assert_eq!(app.phase(), "let go; the minutes still count");
+    assert_eq!(app.phase(), "Skipped before a minute. No lantern.");
     assert!(app.has("undo") && app.lanterns() == 0, "no lantern, and an offer to take it back");
     app.wait(1.0);
     app.char("u");
@@ -339,7 +339,7 @@ fn s_lets_a_block_go_and_u_takes_it_back_so_it_counts_once_finished() {
     assert_eq!((back.phase(), back.lanterns()), ("rest · space when you're ready".into(), 1));
     back.char("h");
     back.look();
-    assert_eq!((back.read("stat-lanterns-value").as_deref(), back.has("stat-let-go")), (Some("1"), false));
+    assert_eq!((back.read("stat-lanterns-value").as_deref(), back.has("stat-skipped")), (Some("1"), false));
 }
 
 #[test]
@@ -633,7 +633,7 @@ fn an_idle_window_wakes_at_four_in_the_morning_and_turns_the_day() {
 }
 
 #[test]
-fn a_block_let_go_can_be_taken_back_until_the_next_start_even_from_today() {
+fn a_skipped_block_can_be_taken_back_until_the_next_start_even_from_today() {
     let mut app = App::new();
     app.one_minute();
     app.space();
@@ -642,7 +642,8 @@ fn a_block_let_go_can_be_taken_back_until_the_next_start_even_from_today() {
     // One ten-minute step with no frames in it: only the wakes the window asked for run.
     app.rt.frame(600.0);
     app.settle();
-    assert_eq!(app.phase(), "rest · space when you're ready", "the quiet ring ended on its own wake");
+    assert_eq!(app.phase(), "Skipped before a minute. No lantern.", "the quiet ring ended on its own wake");
+    assert_eq!(app.rt.state.timer.clock, Clock::Wound);
     assert!(app.has("undo"), "ten minutes on, the offer stands");
     app.char("h");
     app.look();
@@ -692,7 +693,7 @@ fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()), "pressed as a click would");
     assert_eq!(
         (control(&app, "control-play"), control(&app, "control-skip")),
-        ("Pause".into(), "Let go of this block".into())
+        ("Pause".into(), "Skip this block".into())
     );
     app.voiceover_press("control-play");
     app.wait(1.0);
@@ -817,7 +818,7 @@ fn today_keeps_the_running_block_in_sight_and_in_hand() {
     assert_eq!(bar(&app), "Break ready · 05:00");
     app.tap("timer-undo");
     app.look();
-    assert!(bar(&app).starts_with("Focus · 24:"), "a let go comes back from Today: {}", bar(&app));
+    assert!(bar(&app).starts_with("Focus · 24:"), "a skip comes back from Today: {}", bar(&app));
     app.tap("today-close");
     app.look();
     assert_eq!(app.phase(), "focus", "and Back to sunset finds it still running");

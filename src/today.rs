@@ -40,7 +40,7 @@ pub const MONTHS: [&str; 12] = [
 ];
 /// What the strip's marks mean, on each mark's tooltip.
 const LANTERN: &str = "a lantern is a block finished";
-const RING: &str = "a ring is the minutes kept after letting go";
+const RING: &str = "a ring is the minutes kept after a skip";
 /// The strip's viewport, which a crowded day scrolls sideways.
 pub const STRIP: &str = "day-strip-view";
 
@@ -170,7 +170,7 @@ impl Ledger<'_> {
 
 /// The timer as it stands, held at the top of Today so time passing, or a pause, is never out of
 /// sight: the phase and its time, the one press it takes now, and the bell's words until the next
-/// start. A let go can still be taken back from here.
+/// start. A skipped block can still be taken back from here.
 fn now_bar(l: &Ledger<'_>) -> El {
     let k = l.ink();
     let t = l.timer;
@@ -184,7 +184,7 @@ fn now_bar(l: &Ledger<'_>) -> El {
         (Clock::Ticking { .. }, Phase::Long) => format!("Long break · {time} left"),
         (Clock::Paused { .. }, _) => format!("Paused · {time} left"),
         (Clock::Ringing { kept: true, .. }, Phase::Focus) => "Focus complete".into(),
-        (Clock::Ringing { .. }, Phase::Focus) => "Let go".into(),
+        (Clock::Ringing { .. }, Phase::Focus) => "Skipped".into(),
         (Clock::Ringing { .. }, _) => "Break over".into(),
     };
     let press = controls::press_words(t);
@@ -195,7 +195,7 @@ fn now_bar(l: &Ledger<'_>) -> El {
     let mut acts = row().gap(6.0).self_start();
     if t.can_undo() {
         acts = acts.child(
-            button(k, "timer-undo", "Undo let go", "Bring the block back  U")
+            button(k, "timer-undo", "Undo skip", "Bring the block back  U")
                 .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx))),
         );
     }
@@ -274,8 +274,8 @@ pub fn view(l: &Ledger<'_>) -> El {
         &totals.lanterns.to_string(),
         if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
     ));
-    if totals.let_go() > 0 {
-        numbers = numbers.child(stat(k, "let-go", &totals.let_go().to_string(), "let go"));
+    if totals.skipped() > 0 {
+        numbers = numbers.child(stat(k, "skipped", &totals.skipped().to_string(), "skipped"));
     }
     body = body.child(numbers);
     let labels = Log::labels(blocks.iter().map(|(_, b)| *b));
@@ -320,7 +320,7 @@ fn key_row(k: Ink) -> El {
         LineCap::Round,
         ink,
     );
-    let let_go = Shape::new().stroke(ring([7.0, 7.0], [6.0, 2.0], 24, 0.0, std::f32::consts::TAU), 1.3, ink);
+    let skipped = Shape::new().stroke(ring([7.0, 7.0], [6.0, 2.0], 24, 0.0, std::f32::consts::TAU), 1.3, ink);
     let knot = Shape::new()
         .line([7.0, 0.5], [7.0, 11.5], 1.0, LineCap::Round, ink)
         .fill(ring([7.0, 6.0], [1.9, 1.9], 10, 0.0, std::f32::consts::TAU), ink);
@@ -330,7 +330,7 @@ fn key_row(k: Ink) -> El {
         .gap(14.0)
         .center_y()
         .child(mark("key-lantern", lit, "a block finished"))
-        .child(mark("key-ring", let_go, "let go, minutes kept"))
+        .child(mark("key-ring", skipped, "skipped, minutes kept"))
         .child(mark("key-knot", knot, "a pause"))
 }
 
@@ -344,14 +344,14 @@ fn pauses(n: usize) -> String {
     }
 }
 
-/// When a block ran and for how long: "10:40 – 11:05 · 25 min", or "· let go, 9 min kept".
+/// When a block ran and for how long: "10:40 – 11:05 · 25 min", or "· skipped, 9 min kept".
 fn when(cal: Calendar, b: &Block) -> String {
     let (from, to) = (cal.local(b.started()), cal.local(b.ended));
     let span = format!("{}:{:02} – {}:{:02}", from.hour, from.minute, to.hour, to.minute);
     if b.finished() {
         format!("{span} · {}", duration(b.focused))
     } else {
-        format!("{span} · let go, {} kept", duration(b.focused))
+        format!("{span} · skipped, {} kept", duration(b.focused))
     }
 }
 
@@ -466,7 +466,7 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
 }
 
 /// The day along a waterline, with each block where it ended: a lantern for one that ran to
-/// the bell, a ring for one let go. Blocks that ended close together are spread apart, and a day
+/// the bell, a ring for one skipped. Blocks that ended close together are spread apart, and a day
 /// with more than the window holds runs on to the right, scrolled to its newest when Today
 /// opens. On today, a labelled tick marks now.
 fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {

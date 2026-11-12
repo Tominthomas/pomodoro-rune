@@ -52,7 +52,7 @@ A five-minute break waits next. Press Space or click the sky to start it. After 
 
 <p align="center">Left: the end of a focus block. Right: a one-minute demo break played at 3x speed. Normal long breaks default to fifteen minutes.</p>
 
-Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you stop early ("let go"), the minutes you kept show as a ring instead of a lantern, and you can undo it until you start the break or the next block.
+Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you skip a block, it ends early: the minutes you kept still count and show as a ring instead of a lantern. You can undo a skip until you start the break or the next block.
 
 ## Keys
 
@@ -62,8 +62,8 @@ Press `?` in the app to see these. Every control is also a button VoiceOver can 
 | --- | --- |
 | `Space` | Start, pause, or resume |
 | `↑` `↓` | One minute longer or shorter, while the timer waits (`→` and `←` work too) |
-| `S` | Let go of a block, or skip a break |
-| `U` or `⌘Z` | Undo a let go, until you start again |
+| `S` | Skip: end a block early (its minutes count, no lantern), or skip a break |
+| `U` or `⌘Z` | Undo a skip, until you start again |
 | `L` | Name the next block |
 | `1` `2` `3` | How the block felt: deep, steady, or drifting |
 | `H` | Today and the last four weeks |

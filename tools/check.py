@@ -257,16 +257,16 @@ CHECKS = [
         lambda t: label(t, "lantern-1") == "Lantern 2, paused once",
     ),
     (
-        "a block let go rings out with no lantern",
+        "a skipped block rings out with no lantern, and says its minutes still count",
         "cycle",
-        "b3-letgo",
-        lambda t: phase(t) == "let go; the minutes still count" and len(lanterns(t)) == 2,
+        "b3-skipped",
+        lambda t: phase(t) == "Skipped. 1 min still counts, no lantern." and len(lanterns(t)) == 2,
     ),
     (
         "and doesn't count toward the cycle",
         "cycle",
         "b3-break",
-        lambda t: phase(t) == "rest · space when you're ready" and len(lanterns(t)) == 2,
+        lambda t: phase(t) == "Skipped. 1 min still counts, no lantern." and len(lanterns(t)) == 2 and "undo" in t,
     ),
     (
         "four lanterns earn the long break",
@@ -291,22 +291,22 @@ CHECKS = [
         lambda t: len(lanterns(t)) == 4 and all(t[k]["rect"][1] + t[k]["rect"][3] / 2 < 330 for k in lanterns(t)),
     ),
     (
-        "Today counts four lanterns and one let go, and the numbers add up",
+        "Today counts four lanterns and one skipped, and the numbers add up",
         "cycle",
         "today",
         lambda t: (
             text(t, "stat-lanterns-value") == "4"
-            and text(t, "stat-let-go-value") == "1"
+            and text(t, "stat-skipped-value") == "1"
             and "stat-sessions" not in t
             and len(lanterns(t, "day-lantern-")) == 4
             and len(lanterns(t, "day-ring-")) == 1
         ),
     ),
     (
-        "the block let go is a ring that keeps its minutes",
+        "the skipped block is a ring that keeps its minutes",
         "cycle",
         "today",
-        lambda t: "let go, 1 min kept" in label(t, "day-ring-0") and text(t, "stat-focused-value") == "5 min",
+        lambda t: "skipped, 1 min kept" in label(t, "day-ring-0") and text(t, "stat-focused-value") == "5 min",
     ),
     (
         "Today knows what the day was for and how it felt",
@@ -365,13 +365,13 @@ CHECKS = [
         ),
     ),
     (
-        "a block let go can be undone for a moment",
+        "a skipped block can be undone until the next start",
         "undo",
-        "letgo",
+        "skipped",
         lambda t: (
             "undo" in t
-            and phase(t) == "let go; the minutes still count"
-            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "kept")
+            and phase(t) == "Skipped before a minute. No lantern."
+            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "focused")
         ),
     ),
     (
@@ -384,7 +384,7 @@ CHECKS = [
         "and it reaches its bell as one block",
         "undo",
         "today",
-        lambda t: text(t, "stat-lanterns-value") == "1" and "stat-let-go" not in t and "day-ring-0" not in t,
+        lambda t: text(t, "stat-lanterns-value") == "1" and "stat-skipped" not in t and "day-ring-0" not in t,
     ),
     (
         "the click that brings the window forward starts nothing",

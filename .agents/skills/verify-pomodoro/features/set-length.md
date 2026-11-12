@@ -15,7 +15,7 @@ While a block or a break waits, the user sets its length in one-minute steps by 
 
 - Press the arrow keys while the phase line ends in `space to begin` or `space when you're ready`.
 - Move the pointer, then click − or + beside the time.
-- Press on the sun and drag up or down, then let go.
+- Press on the sun and drag up or down, then release.
 - Click `got it` (key `hint-dismiss`) to put the hint away.
 
 ## Driving it with the headless renderer
@@ -25,7 +25,7 @@ Preconditions:
 - The baseline from `README.md`, a first launch with a 25-minute block waiting. Use `--fps 60` for `drag.json`.
 
 - **Hint.** Run `look scripts/drag.json --at 0.1 hint time`. `hint` is drawn and `time` reads `25:00`.
-- **Drag.** Press on the sun at `186,140` and drag down to `186,205`, then let go. Run `look scripts/drag.json --at mark:released phase time hint --out $RUN/released`. `phase` reads `focus · space to begin`, `time` reads whole minutes under `25:00`, and `hint` is absent.
+- **Drag.** Press on the sun at `186,140` and drag down to `186,205`, then release. Run `look scripts/drag.json --at mark:released phase time hint --out $RUN/released`. `phase` reads `focus · space to begin`, `time` reads whole minutes under `25:00`, and `hint` is absent.
 - **Start after drag.** Press Space. Run `look scripts/drag.json --at mark:started phase`. `phase` reads `focus`.
 - **Arrows.** Press Down 24 times. Run `look scripts/cycle.json --at mark:wound --fps 10 time`. `time` reads `01:00`.
 - **Steppers.** Save this as `$RUN/stepper.json` and run `look $RUN/stepper.json --at mark:stepped time shorter longer`. After −, − and +, `time` reads `24:00`, and `shorter` and `longer` are labelled `A minute shorter` and `A minute longer`.
