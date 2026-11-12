@@ -12,7 +12,7 @@ A focus block is one sunset. The user can name it, then starts it, and the sun s
 
 ## How to get to it (user POV)
 
-- Tap the sky, press Space, or click `Start focus` (`control-play`) while the phase line reads `focus · space to begin`. On a first launch it reads `The sun sets as you focus. A finished block lights a lantern.`.
+- Tap the sky, press Space, or click `Start focus` (`control-play`) while the phase line reads `focus · space to begin`. On a first launch it reads `The sun sets as you focus.` then, on its own line, `A finished block lights a lantern.`.
 - Move the pointer or press Tab, then click the play control (`control-play`, labelled `Start`).
 - Press `L`, type a name and press Enter to name the block before starting.
 - After the bell, press `1` (deep), `2` (steady) or `3` (drifting), or click a word under the question.

@@ -237,7 +237,7 @@ fn space_starts_pauses_and_resumes_the_sunset() {
     let mut app = App::new();
     assert_eq!(
         (app.time(), app.phase()),
-        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+        ("25:00".into(), "The sun sets as you focus.\nA finished block lights a lantern.".into())
     );
     app.space();
     app.wait(2.0);
@@ -388,7 +388,7 @@ fn l_from_today_names_the_next_block_and_its_letters_never_reach_the_timer() {
     assert_eq!(app.read("top-text").as_deref(), Some("Study the last unit, slowly"));
     assert_eq!(
         (app.time(), app.phase()),
-        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+        ("25:00".into(), "The sun sets as you focus.\nA finished block lights a lantern.".into())
     );
     assert_eq!(app.rt.state.place, 0, "still at the coast");
     app.space();
@@ -570,7 +570,7 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.wait(1.0);
     assert_eq!(
         (app.time(), app.phase()),
-        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+        ("25:00".into(), "The sun sets as you focus.\nA finished block lights a lantern.".into())
     );
     app.tap("sky");
     app.wait(1.0);
@@ -590,7 +590,7 @@ fn the_activating_click_on_a_control_does_nothing_either() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "The sun sets as you focus. A finished block lights a lantern.");
+    assert_eq!(app.phase(), "The sun sets as you focus.\nA finished block lights a lantern.");
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");

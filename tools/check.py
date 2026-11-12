@@ -396,7 +396,7 @@ CHECKS = [
         "activate",
         "activated",
         lambda t: (
-            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus. A finished block lights a lantern."
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
         ),
     ),
     (
@@ -410,7 +410,7 @@ CHECKS = [
         "activate-control",
         "activated",
         lambda t: (
-            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus. A finished block lights a lantern."
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
         ),
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),

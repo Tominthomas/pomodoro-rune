@@ -58,7 +58,7 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         None => format!("{with_focus} {} with focus", if with_focus == 1 { "day" } else { "days" }),
     };
     let head =
-        DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.8))));
+        DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.9))));
     // Arrows move between days without opening each one, since opening scrolls the page away
     // from the grid; Return or Space opens the day reached.
     let mut weeks = col().gap(GAP).focus_group();
@@ -70,9 +70,9 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         .key("history-scale")
         .gap(5.0)
         .center_y()
-        .child(label(k, "less", 10.5, 450.0, 0.8))
+        .child(label(k, "less", 10.5, 450.0, 0.9))
         .child(samples)
-        .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.8));
+        .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.9));
     col()
         .child(
             row()

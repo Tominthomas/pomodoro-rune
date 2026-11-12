@@ -613,7 +613,7 @@ fn worked_on(l: &Ledger<'_>, labels: &[(&str, u32)], total: u32) -> El {
                                 .max_w(WIDE - 80.0)
                                 .truncate(),
                         )
-                        .child(label(k, &time, 11.5, 450.0, 0.82)),
+                        .child(label(k, &time, 11.5, 480.0, 0.95)),
                 )
                 .child(
                     el().w(WIDE)

@@ -106,7 +106,7 @@ pub fn phase_line(s: &State) -> String {
         (_, Clock::Paused { .. }) => "the sky waits · space to resume".into(),
         (_, Clock::Scrubbing { .. }) => "release to set the length".into(),
         (Phase::Focus, Clock::Wound) if s.teaching() => {
-            "The sun sets as you focus. A finished block lights a lantern.".into()
+            "The sun sets as you focus.\nA finished block lights a lantern.".into()
         }
         (Phase::Focus, Clock::Wound) => "focus · space to begin".into(),
         (Phase::Focus, _) => "focus".into(),
