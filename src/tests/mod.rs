@@ -123,6 +123,12 @@ impl App {
         self.key(Key::Text(c.into()));
     }
 
+    /// ⌘ and `c` together, as a menu's key equivalent reaches the window.
+    fn command(&mut self, c: char) {
+        self.rt.key(KeyEvent { key: Key::Command(c), mods: Mods { cmd: true, ..Mods::default() } });
+        self.wait(STEP);
+    }
+
     fn space(&mut self) {
         self.char(" ");
     }

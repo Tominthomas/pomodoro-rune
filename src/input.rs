@@ -5,7 +5,9 @@ use rune::{Drag, Key, KeyEvent, Phase as DragPhase, Tx};
 
 use crate::log::Felt;
 use crate::timer::{Clock, Event};
-use crate::{Asking, Page, SLOP, State, carry, edit_label, finish_label, open_today, rate, scene, set_place};
+use crate::{
+    Asking, Page, SLOP, State, carry, edit_label, finish_label, open_today, rate, scene, set_larger, set_place,
+};
 
 /// Escape closes whatever is open, innermost first.
 pub fn escape(s: &mut State, tx: &mut Tx) -> bool {
@@ -31,6 +33,10 @@ pub fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
     let now = tx.clock();
     if e.key == Key::Escape {
         return escape(s, tx);
+    }
+    if e.is_command('=') || e.is_command('+') || e.is_command('-') || e.is_command('0') {
+        set_larger(s, e.is_command('=') || e.is_command('+'), tx);
+        return true;
     }
     if e.is_command('z') {
         carry(s, Event::Undo { now }, tx);
@@ -109,7 +115,8 @@ pub fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
                 Clock::Scrubbing { secs } => secs,
                 _ => f64::from(s.timer.length()),
             };
-            let to = scene::length_at(scene::rise(from) + f64::from(d.data - d.y));
+            // The pointer moves in the view's points; the sun in the window's.
+            let to = scene::length_at(scene::rise(from) + f64::from((d.data - d.y) * s.zoom()));
             d.data = d.y;
             carry(s, Event::Scrub { secs: to - from }, tx);
         }

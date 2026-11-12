@@ -21,9 +21,6 @@ pub struct Frame {
 }
 
 impl Frame {
-    /// The window as it first opens.
-    pub const FIRST: Frame = Frame::of(W, H);
-
     /// A window `w` by `h` points: the horizon 330 points down at the first size.
     pub const fn of(w: f32, h: f32) -> Frame {
         Frame { w, h, hz: h * 11.0 / 18.0 }

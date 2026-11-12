@@ -44,3 +44,22 @@ fn today_sets_the_four_weeks_beside_the_day_when_the_window_is_wide() {
     let (day, weeks) = (app.rect("today-day"), app.rect("history"));
     assert!(weeks[1] > day[1] + 200.0 && day[2] > 370.0, "tall and narrow, one column as wide as the window allows");
 }
+
+#[test]
+fn larger_text_draws_words_and_controls_bigger_keeps_the_scene_and_is_remembered() {
+    let mut app = App::new();
+    let (sun, time) = (app.rect("sun"), app.rect("time"));
+    app.command('=');
+    app.look();
+    assert_eq!(app.rt.zoom(), 1.25, "the view is zoomed");
+    let item = menu::items(&app.rt.state).into_iter().find(|i| i.id == "view-larger").unwrap();
+    assert_eq!((item.title.as_str(), item.checked), ("Larger Text", true));
+    let to_window = |r: [f32; 4]| r.map(|v| v * 1.25);
+    assert_eq!(to_window(app.rect("sun")), sun, "the sun is where it was, the size it was");
+    assert!(to_window(app.rect("time"))[3] > time[3] * 1.2, "the time is bigger");
+    let mut back = app.relaunch(60.0);
+    assert_eq!(back.rt.zoom(), 1.25, "and stays on across a launch");
+    back.command('-');
+    back.look();
+    assert_eq!((back.rt.zoom(), back.rect("sun")), (1.0, sun), "⌘− puts it back");
+}

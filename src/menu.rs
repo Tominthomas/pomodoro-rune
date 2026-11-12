@@ -7,7 +7,7 @@ use rune::{MenuItem, Shortcut, Tx};
 use crate::controls::{press_words, skip_words};
 use crate::theme::PLACES;
 use crate::timer::Event;
-use crate::{Page, State, carry, open_today, set_place};
+use crate::{Page, State, carry, open_today, set_larger, set_place};
 
 /// One menu item as the state has it now. Its action is looked up by `id`.
 #[derive(Clone, PartialEq, Debug)]
@@ -53,6 +53,7 @@ pub fn items(s: &State) -> Vec<Item> {
         out.push(Item { checked: s.place == i, gap: i == 0, ..item(id, "View", place.name, "") });
     }
     out.push(item("view-next-place", "View", "Next place", "t"));
+    out.push(Item { checked: s.larger, gap: true, ..item("view-larger", "View", "Larger text", "cmd+=") });
     out.push(item("help-keys", "Help", "Keys", "slash"));
     out
 }
@@ -76,6 +77,7 @@ fn action(id: &str) -> fn(&mut State, &mut Tx) {
         "timer-undo" => |s, tx| carry(s, Event::Undo { now: tx.clock() }, tx),
         "view-today" => |s, tx| open_today(s, matches!(s.page, Page::Scene), tx),
         "view-next-place" => |s, tx| set_place(s, s.place + 1, tx),
+        "view-larger" => |s, tx| set_larger(s, !s.larger, tx),
         "help-keys" => |s, _| s.keys_open = !s.keys_open,
         place => PLACE_IDS.iter().position(|p| *p == place).map_or(|_, _| {}, |i| PICK[i]),
     }

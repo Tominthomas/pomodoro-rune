@@ -68,9 +68,14 @@ Press `?` in the app to see these. The Timer, View and Help menus in the menu ba
 | `1` `2` `3` | How the block felt: deep, steady, or drifting |
 | `H` | Today and the last four weeks |
 | `T` | The next place |
+| `⌘+` `⌘−` | Larger text, or back to the usual size (also View > Larger Text) |
 | `Tab` | Show the controls |
 | `?` | All the keys |
 | `Esc` | Close whatever is open |
+
+## Any size
+
+Drag the window's corner to make it bigger. The sky and the sea fill it, and the time and the controls keep their corners. A wide window shows Today's four weeks beside the day. The app remembers the size between launches. Larger Text in the View menu (`⌘+`) makes the words and controls bigger and leaves the sunset as it is.
 
 ## Three places
 

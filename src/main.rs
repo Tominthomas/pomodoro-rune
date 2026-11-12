@@ -53,6 +53,8 @@ const ACTIVATING: f64 = 0.35;
 const ACKNOWLEDGED: f64 = 2.0;
 /// Left unanswered, the question fades this far into the break.
 const ASK_FOR: f64 = 30.0;
+/// How much bigger Larger Text draws the words and every control: the view's zoom.
+const LARGER: f32 = 1.25;
 /// Quitting waits this long at most for the last save.
 const CLOSE_WAIT: Duration = Duration::from_secs(2);
 
@@ -140,6 +142,10 @@ pub struct State {
     visible: bool,
     /// macOS has been asked to remember the window's frame; it can't be before the window exists.
     framed: bool,
+    /// Larger Text is on: words and controls are drawn bigger, the scene as it is.
+    larger: bool,
+    /// The window's size in its own points, as the last view laid it out.
+    window: Cell<(f32, f32)>,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
     /// block's morning comes up from there.
     dawn_from: Option<(f64, Dawn)>,
@@ -195,12 +201,13 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
     let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
+    let larger = prefs.get::<bool>("larger-text").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.cue_marks, s.place) = (hint, cue_marks, place);
+    (s.hint, s.cue_marks, s.place, s.larger) = (hint, cue_marks, place, larger);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -241,6 +248,8 @@ impl State {
             spent: false,
             visible: true,
             framed: false,
+            larger: false,
+            window: Cell::new((W, H)),
             dawn_from: None,
             reduced: Cell::new(false),
             store,
@@ -355,6 +364,11 @@ impl State {
     /// this, never a frame.
     fn save(&self) {
         self.store.set(study::KEY, self.study.clone());
+    }
+
+    /// How much the view is zoomed: Larger Text, or not.
+    fn zoom(&self) -> f32 {
+        if self.larger { LARGER } else { 1.0 }
     }
 
     /// A block was opened from Today, so its marks no longer need the cue.
@@ -500,6 +514,18 @@ fn describe_block(s: &mut State, serial: u64, change: impl FnOnce(&mut Block)) {
     }
 }
 
+/// Turns Larger Text on or off. On, a window too small to hold the bigger words grows until it
+/// does; it can still be made smaller again, and the words then wrap.
+fn set_larger(s: &mut State, on: bool, tx: &mut Tx) {
+    s.larger = on;
+    s.store.set("larger-text", on);
+    let (w, h) = s.window.get();
+    let fits = (W * LARGER, H * LARGER);
+    if on && (w < fits.0 || h < fits.1) {
+        tx.resize_window((w.max(fits.0), h.max(fits.1)));
+    }
+}
+
 fn set_place(s: &mut State, index: usize, tx: &mut Tx) {
     s.place = index % PLACES.len();
     tx.color_motion(rune::tok::motion::CALM);
@@ -543,7 +569,11 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     // The window as the last layout found it; before the first, the size it opens at.
-    let frame = cx.layout_size("window").map_or(Frame::FIRST, |[w, h]| Frame::of(w, h));
+    // Larger Text zooms the whole view; the scene alone is drawn back at the window's own scale.
+    let zoom = s.zoom();
+    cx.zoom(zoom);
+    let frame = cx.layout_size("window").map_or(Frame::of(W / zoom, H / zoom), |[w, h]| Frame::of(w, h));
+    s.window.set((frame.w * zoom, frame.h * zoom));
     let (water, stars) = s.lanterns();
     // Reduce Motion: a bell or a dawn shows only where it ends.
     let mut sky = Sky::of(&s.timer, s.now, s.dawn().filter(|_| !s.reduced.get()));
@@ -561,7 +591,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         water: &water,
         stars: &stars,
         held: matches!(s.timer.clock, Clock::Paused { .. }),
-        frame,
+        frame: Frame::of(frame.w * zoom, frame.h * zoom),
     };
     let root = el().key("window").w_full().h_full().clip_rounded(0.0).window_drag().on_pointer_move_local(
         |s: &mut State, _, tx: &mut Tx| {
@@ -584,7 +614,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .absolute(0.0, 0.0)
                 .size(frame.w, frame.h)
                 .on_drag(input::drag)
-                .child(scene::view(&scene).key("scene").absolute(0.0, 0.0));
+                .child(scene::view(&scene).key("scene").absolute(0.0, 0.0).origin(0.0, 0.0).scale(1.0 / zoom));
             let k = theme::Ink::on(scene::ground(&scene));
             // The phase line already says it on the scene, so here the status is only heard.
             let status =
