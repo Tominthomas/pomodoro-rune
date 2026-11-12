@@ -24,7 +24,7 @@ Preconditions:
 - The baseline from `README.md`. `undo.json` winds the block to one minute, starts it at 1.0 s and presses `S` at 21.0 s.
 
 - **Skip.** Press `S` 20 seconds into a one-minute block. Run `look scripts/undo.json --at mark:skipped --fps 10 time time-unit phase undo --out $RUN/skipped`. `phase` reads `Skipped before a minute. No lantern.`, `time` reads `under a minute` with `time-unit` `focused`, and `undo` is drawn, labelled `Undo skip`.
-- **Undo.** Press `U` at 23.0 s. Run `look scripts/undo.json --at mark:undone --fps 10 time phase undo --out $RUN/undone`. `phase` reads `focus`, `time` reads `00:38` and `undo` is absent.
+- **Undo.** Press `U` at 23.0 s. Run `look scripts/undo.json --at mark:undone --fps 10 time phase undo --out $RUN/undone`. `phase` reads `focus`, `time` holds `00:38` (at `ink` 0, as a running block hides its digits) and `undo` is absent.
 - **One block.** Run `look scripts/undo.json --at mark:today --fps 10 stat-lanterns-value stat-skipped day-ring-0 --out $RUN/today`. `stat-lanterns-value` reads `1`, and `stat-skipped` and `day-ring-0` are absent.
 - **Ring kept.** Run `look scripts/cycle.json --at mark:b3-skipped --fps 10 phase 'lantern-*'`. `phase` reads `Skipped. 1 min still counts, no lantern.` and only two lanterns exist. At `mark:today`, `stat-skipped-value` reads `1` and `day-ring-0` is labelled with `skipped, 1 min kept`.
 - **Skip a break.** Run `look scripts/cycle.json --at mark:wound-2 --fps 10 phase top-text`. After `S` in the break, `phase` reads `focus · space to begin` and `top-text` reads `Reading & notes`.

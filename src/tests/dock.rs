@@ -16,7 +16,19 @@ fn the_menus_name_what_each_key_does_now_and_dim_what_would_do_nothing() {
     let titles: Vec<String> = menu(&app).into_iter().map(|i| i.0).collect();
     assert_eq!(
         titles,
-        ["Start Focus", "Skip", "Undo Skip", "Today", "Coast", "Lake", "Mesa", "Next Place", "Larger Text", "Keys"]
+        [
+            "Start Focus",
+            "Skip",
+            "Undo Skip",
+            "Today",
+            "Coast",
+            "Lake",
+            "Mesa",
+            "Next Place",
+            "Larger Text",
+            "Always Show Time",
+            "Keys"
+        ]
     );
     assert_eq!(
         (item(&app, "timer-skip"), item(&app, "timer-undo")),

@@ -25,7 +25,7 @@ Preconditions:
 
 - **Start by tap.** Tap the sky. Run `look scripts/start.json --at mark:running time phase --out $RUN/running`. `time` reads `24:58`, says `24 minutes 58 seconds`, and `phase` reads `focus`.
 - **Name and wind.** Press `L`, type `Reading & notes`, press Enter, then press Down 24 times. Run `look scripts/cycle.json --at mark:wound --fps 10 top-text time phase --out $RUN/wound`. `top-text` reads `Reading & notes`, `time` reads `01:00` and `phase` reads `focus · space to begin`.
-- **Last second.** Run `look scripts/cycle.json --at mark:b1-last --fps 10 time`. `time` reads `00:01`.
+- **Last second.** Run `look scripts/cycle.json --at mark:b1-last --fps 10 time`. `time` holds `00:01` and says `1 second`, drawn at `ink` 0, since a running block hides its digits until the pointer moves.
 - **Bell.** Run `look scripts/cycle.json --at mark:b1-bell --fps 10 phase time 'lantern-*' reflect-question 'felt-*' --out $RUN/bell`. `phase` reads `1 of 4 lanterns · 5-minute break ready`, `time` reads `1 min`, only `lantern-0` exists, `reflect-question` reads `How did that block feel? Optional.`, and `felt-deep`, `felt-steady` and `felt-drifting` are drawn.
 - **Answer.** Press `1`. Run `look scripts/cycle.json --at mark:b1-rated --fps 10 reflect-question felt-deep`. `reflect-question` reads `Felt deep. Noted.` and `felt-deep` is absent.
 - **Break.** Run `look scripts/cycle.json --at mark:b1-break --fps 10 phase top-text`. `phase` reads `1 of 4 lanterns · 5-minute break ready` and `top-text` reads `after Reading & notes`.

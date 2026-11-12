@@ -249,7 +249,7 @@ const KEYS: [(&str, &[(&str, &str)]); 3] = [
             ("H", "Today and the last four weeks"),
             ("T", "the next place"),
             ("⌘+  ⌘−", "larger text, or back to the usual size"),
-            ("Tab", "show the controls"),
+            ("Tab", "show the controls and the time"),
             ("?  Esc", "these keys, and close what's open"),
         ],
     ),

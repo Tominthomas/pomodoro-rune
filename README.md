@@ -48,7 +48,7 @@ cp -R target/Pomodoro.app /Applications/
 
 ## How a block goes
 
-A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The sun sinks as the minutes run out.
+A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The time fades too, because the sun is the timer: it sinks as the minutes run out. Move the pointer or press Tab to see the time. It always shows while you set the length, while paused, at the bell and during a break. To keep it in sight all the time, choose View > Always Show Time.
 
 When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. If you run `Pomodoro.app` and allow its notifications, it tells you when a block or break ends while another app is in front. Under `cargo run`, keep the window visible if you want to see when a block ends.
 
@@ -78,7 +78,7 @@ Press `?` in the app to see these. The Timer, View and Help menus in the menu ba
 | `H` | Today and the last four weeks |
 | `T` | The next place |
 | `⌘+` `⌘−` | Larger text, or back to the usual size (also View > Larger Text) |
-| `Tab` | Show the controls |
+| `Tab` | Show the controls and the time |
 | `?` | All the keys |
 | `Esc` | Close whatever is open |
 

@@ -309,6 +309,13 @@ fn label(s: &State, k: Ink) -> El {
     if shy { el.inert() } else { el.focusable(true) }
 }
 
+/// Whether the digits are drawn. While a focus block runs, the sunset is the timer, so they step
+/// back until the pointer or Tab calls the controls out, or "Always show time" is on. While a block
+/// waits, is being set, is held or has rung, and through a break, they show.
+pub fn digits_shown(phase: Phase, clock: &Clock, beckoned: bool, always: bool) -> bool {
+    always || beckoned || phase != Phase::Focus || !matches!(clock, Clock::Ticking { .. })
+}
+
 /// The time, with what it is when that isn't plain: a block's minutes once it ends, or "paused"
 /// while it is held. While it waits, a minute either way sits beside it: drawn once
 /// the pointer or Tab calls the controls out, and always there for `VoiceOver`.
@@ -328,8 +335,11 @@ fn time_row(s: &State, k: Ink) -> El {
     };
     let display =
         TextStyle { features: "'tnum' 1", variations: "'opsz' 32", tracking: -0.3, ..TextStyle::new(DISPLAY, 300.0) };
+    // Hidden digits keep their element and only lose their ink: a faded element would leave the
+    // accessibility tree, and `VoiceOver` still reads the time.
+    let ink = if digits_shown(t.phase, &t.clock, s.beckoned(), s.always_time) { BRIGHT } else { 0.0 };
     let time =
-        text(shown).key("time").font(display).color(k.text.alpha(BRIGHT)).role("timer").label(name).a11y_value(said);
+        text(shown).key("time").font(display).color(k.text.alpha(ink)).role("timer").label(name).a11y_value(said);
     // One row in every state, so the digits keep their place and never fade in anew.
     let mut time = row().gap(6.0).items_end().child(time);
     if let Some(unit) = unit {

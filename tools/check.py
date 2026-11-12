@@ -25,6 +25,7 @@ APP = ROOT / "target/release/pomodoro"
 # The short script that checks digits to the second keeps full rate, where a tap lands on time.
 FPS = {
     "start": "60",
+    "digits": "60",
     "activate": "60",
     "activate-control": "60",
     "dock": "30",
@@ -143,6 +144,13 @@ def text(t, key):
     return e.get("text") if ink(e) >= READABLE else None
 
 
+def left(t):
+    """The time the readout holds. Drawn, it must be readable; while a focus block runs it may be
+    hidden outright, never half there."""
+    e = t.get("time", {})
+    return e.get("text") if ink(e) == 0 else text(t, "time")
+
+
 def label(t, key):
     return t.get(key, {}).get("label") or ""
 
@@ -241,6 +249,27 @@ CHECKS = [
         lambda t: opacity(t, "control-play-look") == 0.0 and t["@a11y"].get("control-play", {}).get("name") == "Pause",
     ),
     (
+        "while a block waits, its length shows",
+        "digits",
+        "waiting",
+        lambda t: text(t, "time") == "25:00",
+    ),
+    (
+        "once it runs, the sunset is the timer: the digits step back and VoiceOver still reads them",
+        "digits",
+        "hidden",
+        lambda t: text(t, "time") is None and spoken(t, "time") == "24 minutes 58 seconds",
+    ),
+    ("the pointer calls them out", "digits", "called", lambda t: text(t, "time") == "24:57"),
+    ("and they step back once it rests", "digits", "rested", lambda t: text(t, "time") is None),
+    ("paused, they show where it was held", "digits", "paused", lambda t: text(t, "time") == "24:54"),
+    (
+        "with Always Show Time, they stay through the block",
+        "digits",
+        "always",
+        lambda t: text(t, "time") == "24:51" and phase(t) == "focus",
+    ),
+    (
         "a label is typed without starting the clock, and arrows set one minute",
         "cycle",
         "wound",
@@ -250,7 +279,7 @@ CHECKS = [
             and phase(t) == "focus · space to begin"
         ),
     ),
-    ("the last second counts down", "cycle", "b1-last", lambda t: text(t, "time") == "00:01"),
+    ("the last second counts down", "cycle", "b1-last", lambda t: left(t) == "00:01"),
     (
         "the bell lights a lantern for the block",
         "cycle",
@@ -407,7 +436,7 @@ CHECKS = [
         "undo puts the block back, running",
         "undo",
         "undone",
-        lambda t: phase(t) == "focus" and text(t, "time") == "00:38" and "undo" not in t,
+        lambda t: phase(t) == "focus" and left(t) == "00:38" and "undo" not in t,
     ),
     (
         "and it reaches its bell as one block",

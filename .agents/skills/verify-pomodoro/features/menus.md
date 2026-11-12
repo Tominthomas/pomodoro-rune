@@ -5,9 +5,9 @@ The menu bar has a Timer menu, a View menu and a Help menu next to the standard 
 ## Sub-features
 
 - `menu-timer` lists the primary action (Space), `Skip` (S) and `Undo Skip` (⌘Z).
-- `menu-view` lists `Today` (H), one item per place, and `Next Place` (T).
+- `menu-view` lists `Today` (H), one item per place, `Next Place` (T), `Larger Text` (⌘+) and `Always Show Time`, a ticked toggle with no key.
 - `menu-help` lists `Keys` (/).
-- `menu-state` dims Skip and Undo Skip when they don't apply, and ticks Today and the current place.
+- `menu-state` dims Skip and Undo Skip when they don't apply, and ticks Today, the current place, Larger Text and Always Show Time when they are on.
 
 ## How to get to it (user POV)
 
