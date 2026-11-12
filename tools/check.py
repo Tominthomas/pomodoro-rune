@@ -57,6 +57,10 @@ SIZE = {
     "size-larger-small": "380x540",
     "history-larger-small": "380x540",
 }
+# Scripts run as if the window last closed at this frame, AppKit's "x y w h" then the screen's.
+# NSUserDefaults reads a `-key value` pair on the command line over the prefs file, which stays as
+# it was.
+SAVED = {"saved-frame": "100 100 900 700 0 0 1920 1050"}
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
 # inherits. src/tests/mod.rs holds the same floor.
@@ -77,12 +81,14 @@ def ink(e):
 def run(script, at, out_flag, out, extra=()):
     scene = ["--scene", SCENE[script]] if script in SCENE else []
     size = ["--size", SIZE[script]] if script in SIZE else []
+    saved = ["-NSWindow Frame pomodoro", SAVED[script]] if script in SAVED else []
     cmd = [
         APP,
         "--script",
         ROOT / "scripts" / f"{script}.json",
         *scene,
         *size,
+        *saved,
         out_flag,
         out,
         "--at",
@@ -721,6 +727,15 @@ CHECKS.append(
         "Larger Text grows the smallest window until the bigger words fit: 380 x 540 of its points",
         "size-larger-small",
         "grown",
+        lambda t: t["@view"] == [380.0, 540.0],
+    )
+)
+
+CHECKS.append(
+    (
+        "a headless run renders at its first size, whatever size the window last closed at",
+        "saved-frame",
+        "open",
         lambda t: t["@view"] == [380.0, 540.0],
     )
 )

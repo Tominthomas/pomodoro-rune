@@ -85,3 +85,19 @@ fn larger_text_in_the_smallest_window_takes_two_rows_and_keeps_everything_inside
     app.look();
     assert!(within(app.rect("keys")), "the key card fits: {:?}", app.rect("keys"));
 }
+
+#[test]
+fn the_window_opens_at_its_saved_size_only_in_a_window_and_never_below_the_smallest() {
+    let cases = [
+        ("nothing saved", None, (W, H)),
+        ("saved larger", Some((900.0, 700.0)), (900.0, 700.0)),
+        ("saved at the smallest", Some((W, H)), (W, H)),
+        ("saved too narrow", Some((56.0, 700.0)), (W, H)),
+        ("saved too short", Some((900.0, 30.0)), (W, H)),
+    ];
+    for (case, saved, opens) in cases {
+        assert_eq!(opening_size(false, || saved), opens, "in a window, {case}");
+    }
+    let size = opening_size(true, || panic!("a headless run read the saved frame"));
+    assert_eq!(size, (W, H), "headless, it opens at the first size");
+}
