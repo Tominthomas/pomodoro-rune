@@ -543,6 +543,17 @@ CHECKS = [
         ),
     ),
     (
+        "and shows that day's strip and numbers at the top, under its held date",
+        "today",
+        "yesterday",
+        lambda t: (
+            t["day-strip-view"]["rect"][1] >= t["today-scroll"]["rect"][1] - 0.5
+            and t["stat-focused-value"]["rect"][1] + t["stat-focused-value"]["rect"][3]
+            <= t["today-scroll"]["rect"][1] + t["today-scroll"]["rect"][3]
+            and held(t)
+        ),
+    ),
+    (
         "and Today comes back",
         "today",
         "back",

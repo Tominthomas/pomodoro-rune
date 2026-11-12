@@ -59,7 +59,9 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
     };
     let head =
         DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.8))));
-    let mut weeks = col().gap(GAP).focus_group().focus_follows();
+    // Arrows move between days without opening each one, since opening scrolls the page away
+    // from the grid; Return or Space opens the day reached.
+    let mut weeks = col().gap(GAP).focus_group();
     for week in days.chunks(7) {
         weeks = weeks.child(week.iter().fold(row().gap(GAP), |r, &day| r.child(cell(l, day, today))));
     }
@@ -188,9 +190,9 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
             if let Some(n) = nav(s) {
                 n.pick_day(day, today);
             }
-            // Arrows press the tile they reach, and the day it opens would otherwise keep the
-            // grid where it was.
-            tx.scroll_into_view(format!("day-{}", day.0));
+            // The answer to picking a day is that day: its strip and numbers at the top of the
+            // page, under the date it now shows.
+            tx.scroll_to("today-scroll", 0.0, 0.0);
         }));
     column(match (l.day == day, day == today) {
         (true, _) => base.border(2.0, k.text.alpha(0.95)),
