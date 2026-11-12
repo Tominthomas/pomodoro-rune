@@ -37,11 +37,20 @@ cargo run --release
 
 `rust-toolchain.toml` pins the Rust version, so rustup installs the right one on the first build.
 
+To install it as an app with its lantern icon, build the bundle and copy it into Applications:
+
+```sh
+tools/bundle.sh
+cp -R target/Pomodoro.app /Applications/
+```
+
+`tools/bundle.sh` builds the release binary, then writes `target/Pomodoro.app`, signed ad hoc, and `target/Pomodoro.dmg`. Only the app can post notifications. `cargo run` can't.
+
 ## How a block goes
 
 A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The sun sinks as the minutes run out.
 
-When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
+When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. If you run `Pomodoro.app` and allow its notifications, it tells you when a block or break ends while another app is in front. Under `cargo run`, keep the window visible if you want to see when a block ends.
 
 A five-minute break waits next. Press Space or click the sky to start it. After the fourth lantern, the break is fifteen minutes, and the lanterns rise into the night. When the break ends, dawn opens the next block, which waits for you to start it.
 
