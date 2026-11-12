@@ -73,9 +73,10 @@ pub fn scrim(k: Ink, f: Frame) -> El {
             [(0.0, shade.alpha(0.0)), (0.14, shade.alpha(0.66 * a)), (1.0, shade.alpha(0.74 * a))],
         );
     }
-    el().key("scrim").absolute(0.0, f.h - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
-        [0.05, 0.85],
-        [340.0, 225.0],
+    // Tall enough that the readout's first line, the highest, still sits in the shade.
+    el().key("scrim").absolute(0.0, f.h - 320.0).size(350.0, 320.0).a11y_hidden().radial_gradient(
+        [0.05, 0.87],
+        [340.0, 265.0],
         [
             (0.0, shade.alpha(0.62 * a)),
             (0.5, shade.alpha(0.5 * a)),
