@@ -42,7 +42,7 @@ fn docked(k: Ink, key: &str, label: &str, keys: &str, radius: f32, shown: bool, 
         .shortcut_hint(keys.to_string())
         .focusable(shown)
         .focus_ring(1.5, 1.5, k.text.alpha(0.95))
-        .child(look.key(format!("{key}-look")).animated_changes().opacity(if shown { 1.0 } else { 0.0 }))
+        .child(look.key(format!("{key}-look")).a11y_hidden().animated_changes().opacity(if shown { 1.0 } else { 0.0 }))
 }
 
 /// A quiet control's look: its words on a soft pill.
