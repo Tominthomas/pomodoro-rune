@@ -18,6 +18,10 @@ jobs:
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: pipx install ruff==0.17.4
+      # Prebuilt binaries of the tools tools/ci.sh runs, at pinned versions.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: typos@1.51.1,taplo@0.10.0,cargo-machete@0.9.2,cargo-deny@0.20.2
       - run: tools/ci.sh
         env:
           # Hosted runners are VMs whose paravirtual GPU has not been shown to render the app

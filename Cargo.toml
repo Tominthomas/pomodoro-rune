@@ -30,6 +30,7 @@ debug = "line-tables-only"
 unsafe_code = "forbid"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unused_qualifications = "warn"
+dead_code_pub_in_binary = "warn"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -40,6 +41,9 @@ panic = "warn"
 todo = "warn"
 unimplemented = "warn"
 dbg_macro = "warn"
+# Cloning only to please the borrow checker, and `let _ =` hiding a failed result.
+redundant_clone = "warn"
+let_underscore_must_use = "warn"
 # A lint is silenced only with #[expect(lint, reason = "...")], which also fails once it is stale.
 allow_attributes = "warn"
 allow_attributes_without_reason = "warn"
