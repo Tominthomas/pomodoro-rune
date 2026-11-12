@@ -15,10 +15,12 @@ name = "pomodoro"
 path = "src/main.rs"
 
 [dependencies]
+png = "0.18"
 rune = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
 rune-mac = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tray-icon = { version = "0.26", default-features = false }
 
 [patch.crates-io]
 wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "bb310fc9e2c4a1a1937814c71efc08924a5c2885" }
