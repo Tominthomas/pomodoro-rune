@@ -1,6 +1,7 @@
 #!/bin/sh
 # Renders the review pack into shots/review: every scene in every place, light and dark; Today
-# and History in each place, light and dark; the hover controls; a video of the last minute of a
+# and History in each place, light and dark; the hover controls; a tall, a wide and two Larger
+# Text windows in each place, light and dark; a video of the last minute of a
 # sunset through the bell into the break, and one of a one-minute long break through to dawn. Then frames.txt: per scene, the CPU time of its
 # first frames (before the GPU queue fills and frame times measure the GPU instead), and how
 # many frames in two seconds differ from the one before, which is what a window redraws.
@@ -44,6 +45,37 @@ for sc in $SCENES today; do
     -filter_complex "[0][1][2]hstack=3[a];[3][4][5]hstack=3[b];[a][b]vstack=2,scale=iw/2:-1" "$OUT/places-$sc.png"
 done
 $APP --scene controls --snap "$OUT/coast-light-controls.png" --at 0.6 >/dev/null 2>&1
+
+# Other window sizes, in every place, light and dark: the waiting block, late in a block with
+# the controls out, and Today. Larger Text is shot in the window it grows to and in the smallest,
+# made small again after it grew.
+for n in 0 1 2; do
+  place=$(echo "coast lake mesa" | cut -d' ' -f$((n + 1)))
+  for size in tall wide larger larger-small; do
+    case $size in
+      tall) dims=420x780 ;; wide) dims=900x600 ;; larger) dims=475x675 ;; larger-small) dims=380x540 ;;
+    esac
+    python3 -c "
+import json, sys
+n, size = int(sys.argv[1]), sys.argv[2]
+events = [{'t': 0.05 + 0.02 * i, 'type': 'key', 'name': 't'} for i in range(n)]
+if size.startswith('larger'):
+    events.append({'t': 0.1, 'type': 'key', 'name': '=', 'cmd': True})
+if size == 'larger-small':
+    events.append({'t': 0.6, 'type': 'resize', 'dw': -95, 'dh': -135, 'dur': 0.05})
+events.append({'t': 0.9, 'type': 'move', 'x': 150, 'y': 150})
+print(json.dumps({'events': events}))
+" $n $size > "$TMP/size.json"
+    for theme in light dark; do
+      for sc in wound focus-late today; do
+        scene=$([ "$sc" = wound ] || echo "--scene $sc")
+        $APP --script "$TMP/size.json" $scene --theme $theme --size $dims --snap "$OUT/$place-$theme-$size-$sc.png" --at 1.2 >/dev/null 2>&1
+      done
+      ffmpeg -loglevel error -y $(for sc in wound focus-late today; do printf -- "-i $OUT/$place-$theme-$size-$sc.png "; done) \
+        -filter_complex "hstack=3,scale=iw/2:-1" "$OUT/sheet-$place-$theme-$size.png"
+    done
+  done
+done
 
 $APP --scene last-minute --script scripts/bell.json --video "$OUT/focus-to-bell.mp4" --fps 30 >/dev/null 2>&1
 $APP --scene night-minute --script scripts/night.json --video "$OUT/long-break.mp4" --fps 30 >/dev/null 2>&1

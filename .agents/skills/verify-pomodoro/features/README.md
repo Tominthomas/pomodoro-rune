@@ -20,7 +20,7 @@ This directory is the maintained source for verifying what a user sees in Pomodo
 ## Proof and skip reporting
 
 - Keep `look --out` captures from before and after the action, the `tools/check.py <script>` output, and a `--video ... --keys --pointer` of the journey.
-- For a saved change, show it again from a second view, such as Today's numbers, the lantern's label, or a `src/tests.rs` relaunch test.
+- For a saved change, show it again from a second view, such as Today's numbers, the lantern's label, or a `src/tests/` relaunch test.
 - Record the feature file and sub-feature ID with each artifact in `$RUN/log.txt`.
 - If a path can't be driven headless, list it as unverified with the reason from the feature's `Gotchas` or SKILL.md's "Real window". Never report it as verified through a different path.
 
@@ -43,5 +43,6 @@ Each feature file starts with an H1 title and one paragraph on the behavior a us
 - [Today and history](./today-history.md) covers Today's numbers, block detail, feelings, renaming and past days.
 - [Places](./places.md) covers Coast, Lake and Mesa by key and by menu.
 - [Menus](./menus.md) covers the Timer, View and Help menus in the menu bar.
+- [Window sizes and Larger Text](./window-sizes.md) covers resizing, Today's columns, Larger Text and narrow views.
 
 Not mapped yet, though `tools/check.py` covers them: the controls in sight while a block waits and receding once it runs (`hover`, `dock`), the activating click (`activate`, `activate-control`), the keys card (`keys`) and long labels (`long-label`).

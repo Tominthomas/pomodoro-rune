@@ -10,12 +10,15 @@ use rune::{Color, El, canvas, col, el, row, text};
 use crate::drawing::{disc, halo};
 use crate::log::{Day, Log, duration};
 use crate::theme::rgb;
-use crate::today::{DAYS, Ledger, MONTHS, WIDE, label, nav};
+use crate::today::{DAYS, Ledger, MONTHS, label, nav};
 use crate::{State, guarded};
 
 const GAP: f32 = 5.0;
 /// A day's sunset fills the width, seven to a week.
-const TILE: (f32, f32) = ((WIDE - 6.0 * GAP) / 7.0, 22.0);
+/// A day's tile across a week of `wide` points, and its height.
+fn tile(wide: f32) -> (f32, f32) {
+    ((wide - 6.0 * GAP) / 7.0, 22.0 * (wide / 336.0).clamp(1.0, 1.3))
+}
 /// Where the sea meets the sky in a tile, from its top.
 const SHORE: f32 = 0.62;
 /// Focused minutes a History tile steps up at: none, then each of these or more.
@@ -57,8 +60,9 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         }
         None => format!("{with_focus} {} with focus", if with_focus == 1 { "day" } else { "days" }),
     };
-    let head =
-        DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.9))));
+    let head = DAYS
+        .iter()
+        .fold(row().gap(GAP), |r, d| r.child(el().w(tile(l.wide).0).child(label(k, &d[..1], 10.5, 500.0, 0.9))));
     // Arrows move between days without opening each one, since opening scrolls the page away
     // from the grid; Return or Space opens the day reached.
     let mut weeks = col().gap(GAP).focus_group();
@@ -76,7 +80,7 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
     col()
         .child(
             row()
-                .w(WIDE)
+                .w(l.wide)
                 .justify_between()
                 .center_y()
                 .child(
@@ -133,7 +137,7 @@ fn sunset(l: &Ledger<'_>, step: usize, lit: u32, (w, h): (f32, f32)) -> El {
 /// sky; a day still to come is only an outline, so the two never read alike.
 fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let k = l.ink();
-    let (tw, th) = TILE;
+    let (tw, th) = tile(l.wide);
     let key = format!("day-{}", day.0);
     let d = day.date();
     let named = format!("{} {} {}", DAYS[day.weekday() as usize], d.day, MONTHS[d.month as usize - 1]);
@@ -167,7 +171,7 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
         );
         el().size(tw, th).radius(6.0).fill(k.text.alpha(0.07)).child(canvas(still).size(tw, th))
     } else {
-        sunset(l, step(t.focused), t.lanterns, TILE)
+        sunset(l, step(t.focused), t.lanterns, tile(l.wide))
     };
     let base = tile
         .key(key)

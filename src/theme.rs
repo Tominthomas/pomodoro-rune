@@ -6,10 +6,26 @@ use rune::Color;
 use rune::color::srgb_decode;
 use rune::shape::{LineCap, Path, Shape};
 
-/// The window, in points, and where the sea meets the sky.
+/// The window as it first opens, in points: also the smallest it goes.
 pub const W: f32 = 380.0;
 pub const H: f32 = 540.0;
-pub const HZ: f32 = 330.0;
+
+/// The window's size in points, and where the sea meets the sky in it. The horizon sits at the
+/// same share of the height at every size, so a taller window has more sky and more sea, and a
+/// wider one a longer horizon; nothing in the scene grows.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Frame {
+    pub w: f32,
+    pub h: f32,
+    pub hz: f32,
+}
+
+impl Frame {
+    /// A window `w` by `h` points: the horizon 330 points down at the first size.
+    pub const fn of(w: f32, h: f32) -> Frame {
+        Frame { w, h, hz: h * 11.0 / 18.0 }
+    }
+}
 
 /// One moment of the evening: zenith, middle and low sky, the sea near and far, the sun, its
 /// glow and the clouds.
@@ -44,7 +60,7 @@ pub struct Place {
     keys: Keys,
     /// Draws the land along the horizon in `near` and `far` tones; `up` is -1 to draw it upside
     /// down below the horizon, as its reflection.
-    land: fn(Shape, Color, Color, f32) -> Shape,
+    land: fn(Shape, Color, Color, f32, Frame) -> Shape,
     /// The rock or forest the land is shaded toward.
     rock: u32,
     pub water: Water,
@@ -117,16 +133,16 @@ impl Place {
     }
 
     /// The land against the horizon, toned for this moment of the evening.
-    pub fn land(&self, sh: Shape, p: &Pal) -> Shape {
+    pub fn land(&self, sh: Shape, p: &Pal, f: Frame) -> Shape {
         let (near, far) = self.land_tones(p);
-        (self.land)(sh, near, far, 1.0)
+        (self.land)(sh, near, far, 1.0, f)
     }
 
     /// The land mirrored in still water, a little lighter and bluer than the land itself.
-    pub fn reflection(&self, sh: Shape, p: &Pal, strength: f32) -> Shape {
+    pub fn reflection(&self, sh: Shape, p: &Pal, strength: f32, f: Frame) -> Shape {
         let (near, far) = self.land_tones(p);
         let tint = |c: Color| c.mix(p.sea_hi, 0.3).alpha(strength);
-        (self.land)(sh, tint(near), tint(far), -1.0)
+        (self.land)(sh, tint(near), tint(far), -1.0, f)
     }
 
     fn land_tones(&self, p: &Pal) -> (Color, Color) {
@@ -136,13 +152,15 @@ impl Place {
 }
 
 /// The point `h` above the horizon, or below it when `up` is -1.
-fn at(x: f32, h: f32, up: f32) -> [f32; 2] {
-    [x, HZ - up * h]
+fn at(f: Frame, x: f32, h: f32, up: f32) -> [f32; 2] {
+    [x, f.hz - up * h]
 }
 
 /// A low headland on the left and a far spit of land on the right.
-fn coast(sh: Shape, near: Color, far: Color, up: f32) -> Shape {
-    let p = |x, h| at(x, h, up);
+/// The headland keeps to the left edge and the spit to the right; a wider window opens the sea
+/// between them.
+fn coast(sh: Shape, near: Color, far: Color, up: f32, f: Frame) -> Shape {
+    let p = |x, h| at(f, x, h, up);
     let hill = Path::new()
         .move_to(p(-4.0, -1.0))
         .line_to(p(-4.0, 28.0))
@@ -151,17 +169,18 @@ fn coast(sh: Shape, near: Color, far: Color, up: f32) -> Shape {
         .cubic_to(p(142.0, 1.0), p(150.0, 0.0), p(158.0, -1.0))
         .close();
     let spit = Path::new()
-        .move_to(p(W - 96.0, -1.0))
-        .cubic_to(p(W - 70.0, 7.0), p(W - 40.0, 9.0), p(W - 18.0, 6.0))
-        .cubic_to(p(W - 8.0, 5.0), p(W, 4.0), p(W + 4.0, 4.0))
-        .line_to(p(W + 4.0, -1.0))
+        .move_to(p(f.w - 96.0, -1.0))
+        .cubic_to(p(f.w - 70.0, 7.0), p(f.w - 40.0, 9.0), p(f.w - 18.0, 6.0))
+        .cubic_to(p(f.w - 8.0, 5.0), p(f.w, 4.0), p(f.w + 4.0, 4.0))
+        .line_to(p(f.w + 4.0, -1.0))
         .close();
     sh.fill_path(&spit, far).fill_path(&hill, near)
 }
 
 /// A hazy mountain ridge across the far shore, and pines down to the water on either side.
-fn lake(mut sh: Shape, near: Color, far: Color, up: f32) -> Shape {
-    let p = |x, h| at(x, h, up);
+/// The ridge spans the far shore at any width; the pines keep to the two edges.
+fn lake(mut sh: Shape, near: Color, far: Color, up: f32, f: Frame) -> Shape {
+    let p = |x, h| at(f, x, h, up);
     let ridge: Vec<[f32; 2]> = [
         (-4.0, 0.0),
         (-4.0, 26.0),
@@ -182,7 +201,7 @@ fn lake(mut sh: Shape, near: Color, far: Color, up: f32) -> Shape {
         (384.0, 0.0),
     ]
     .iter()
-    .map(|&(x, h)| p(x, h - 1.0))
+    .map(|&(x, h)| p(x * f.w / W, h - 1.0))
     .collect();
     sh = sh.fill(ridge, far.mix(near, 0.15).alpha(0.75 * far.a));
     let shore = |x0: f32, x1: f32, h0: f32, h1: f32| {
@@ -192,12 +211,12 @@ fn lake(mut sh: Shape, near: Color, far: Color, up: f32) -> Shape {
             .cubic_to(p(x0 + (x1 - x0) * 0.4, h0), p(x0 + (x1 - x0) * 0.7, h1), p(x1, -1.0))
             .close()
     };
-    sh = sh.fill_path(&shore(-4.0, 128.0, 16.0, 4.0), near).fill_path(&shore(W + 4.0, W - 92.0, 10.0, 3.0), near);
+    sh = sh.fill_path(&shore(-4.0, 128.0, 16.0, 4.0), near).fill_path(&shore(f.w + 4.0, f.w - 92.0, 10.0, 3.0), near);
     // Pines: a stack of narrowing triangles each, taller near the edges.
     for i in 0..22 {
         let left = i < 14;
         let k = if left { i as f32 / 13.0 } else { (i - 14) as f32 / 7.0 };
-        let x = if left { -2.0 + k * 118.0 } else { W + 2.0 - k * 80.0 };
+        let x = if left { -2.0 + k * 118.0 } else { f.w + 2.0 - k * 80.0 };
         let base = if left { 16.0 * (1.0 - k).powf(0.7) } else { 10.0 * (1.0 - k).powf(0.7) };
         let tall = (34.0 - 26.0 * k) * (0.75 + 0.5 * crate::drawing::hash(i as u32 + 300));
         let wide = tall * 0.32;
@@ -214,9 +233,12 @@ fn lake(mut sh: Shape, near: Color, far: Color, up: f32) -> Shape {
 
 /// Flat-topped mesas and a butte far off across the salt: a sheer caprock over a concave
 /// skirt of scree.
-fn mesa(sh: Shape, near: Color, far: Color, up: f32) -> Shape {
-    let p = |x, h| at(x, h, up);
+/// The buttes keep their size; a wider window spreads them along the horizon.
+fn mesa(sh: Shape, near: Color, far: Color, up: f32, f: Frame) -> Shape {
+    let p = |x, h| at(f, x, h, up);
     let butte = |x0: f32, x1: f32, h: f32, skirt: f32| {
+        let shift = f32::midpoint(x0, x1) * (f.w / W - 1.0);
+        let (x0, x1) = (x0 + shift, x1 + shift);
         Path::new()
             .move_to(p(x0 - skirt, -1.0))
             .quad_to(p(x0 - skirt * 0.2, h * 0.1), p(x0 - 2.0, h * 0.58))

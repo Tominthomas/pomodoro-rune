@@ -14,12 +14,17 @@ use crate::history;
 use crate::lantern::{self, Lantern, Pose};
 use crate::log::{Block, Calendar, Day, Felt, Log, Totals, duration};
 use crate::readout::{HIT, button, mmss};
-use crate::theme::{H, Ink, Place, W, rgb};
+use crate::theme::{Frame, Ink, Place, rgb};
 use crate::timer::{Clock, Event, Phase, Timer};
 use crate::{Page, State, carry, describe_block, guarded, open_today};
 
 const PAD: f32 = 22.0;
-pub const WIDE: f32 = W - 2.0 * PAD;
+/// Today's column never runs wider than this, so a line stays easy to read across; a wide
+/// window sets two columns side by side instead, the day beside the four weeks.
+const MAX_WIDE: f32 = 460.0;
+/// Two columns need this much width each, and this between them.
+const SPLIT_AT: f32 = 340.0;
+const GUTTER: f32 = 36.0;
 /// Lanterns on the strip keep at least this far apart, however close their blocks ended: wider
 /// than a target, so no two targets overlap.
 const SPREAD: f32 = HIT + 2.0;
@@ -60,6 +65,9 @@ pub struct Ledger<'a> {
     pub unsaved: Option<El>,
     /// Whether to say that a mark opens its block: until one has been opened.
     pub cue: bool,
+    /// How wide a column is, and whether the four weeks stand beside the day instead of under it.
+    pub wide: f32,
+    pub split: bool,
     /// The timer as it stands, and the window's clock to read it at.
     pub timer: &'a Timer,
     pub clock: f64,
@@ -156,7 +164,22 @@ fn navigate(f: impl Fn(&mut Nav) + 'static) -> impl Fn(&mut State, &mut Tx) + 's
     })
 }
 
+/// Today's columns in a window `f`: their width, and whether there are two.
+pub fn columns(f: Frame) -> (f32, bool) {
+    let room = f.w - 2.0 * PAD;
+    if room >= 2.0 * SPLIT_AT + GUTTER {
+        (((room - GUTTER) / 2.0).min(MAX_WIDE), true)
+    } else {
+        (room.min(MAX_WIDE), false)
+    }
+}
+
 impl Ledger<'_> {
+    /// The width the timer and the day's name span: both columns when there are two.
+    fn span(&self) -> f32 {
+        if self.split { 2.0 * self.wide + GUTTER } else { self.wide }
+    }
+
     pub fn today(&self) -> Day {
         self.cal.day_of(self.now)
     }
@@ -204,7 +227,7 @@ fn now_bar(l: &Ledger<'_>) -> El {
     );
     row()
         .key("timer-bar")
-        .w(WIDE)
+        .w(l.span())
         .min_h(44.0)
         .px(12.0)
         .py(8.0)
@@ -242,7 +265,7 @@ pub fn view(l: &Ledger<'_>) -> El {
             .on_press_tx(guarded(|s, tx| open_today(s, false, tx))),
     );
     let head = row()
-        .w(WIDE)
+        .w(l.span())
         .justify_between()
         .child(
             col()
@@ -251,12 +274,13 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &subtitle, 12.0, 450.0, 0.82).key("today-date")),
         )
         .child(actions.self_start());
-    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0)).child(now_bar(l));
+    let mut page =
+        col().key("today").pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0)).items_center().child(now_bar(l));
     if let Some(unsaved) = l.unsaved.clone() {
-        page = page.child(el().h(8.0)).child(unsaved.w(WIDE));
+        page = page.child(el().h(8.0)).child(unsaved.w(l.span()));
     }
     let page = page.child(el().h(14.0)).child(head).child(el().h(6.0));
-    let mut body = col().key("today-body").pb(PAD);
+    let mut body = col().key("today-day").w(l.wide);
     let opened = l.nav.serial().and_then(|n| blocks.iter().find(|(m, _)| *m == n)).map(|(n, b)| (*n, *b));
     let under = match opened {
         Some((n, b)) => detail(l, n, b),
@@ -264,21 +288,24 @@ pub fn view(l: &Ledger<'_>) -> El {
             label(k, "No blocks yet today. The sea is calm.", 11.5, 450.0, 0.82).key("strip-note")
         }
         None if blocks.is_empty() => label(k, "No blocks this day.", 11.5, 450.0, 0.82).key("strip-note"),
-        None if l.cue => col().gap(6.0).child(key_row(k)).child(
+        None if l.cue => col().gap(6.0).child(key_row(k, l.wide)).child(
             label(k, "Select a lantern or ring to open the block", 10.5, 460.0, 0.82)
                 .key("strip-cue")
-                .max_w(WIDE)
+                .max_w(l.wide)
                 .wrap(),
         ),
-        None => key_row(k),
+        None => key_row(k, l.wide),
     };
     body = body.child(el().h(2.0)).child(strip(l, &blocks)).child(under).child(el().h(14.0));
-    let mut numbers = row().gap(28.0).child(stat(k, "focused", &duration(totals.focused), "focus logged")).child(stat(
-        k,
-        "lanterns",
-        &totals.lanterns.to_string(),
-        if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
-    ));
+    let mut numbers =
+        row().gaps(10.0, 28.0).flex_wrap().child(stat(k, "focused", &duration(totals.focused), "focus logged")).child(
+            stat(
+                k,
+                "lanterns",
+                &totals.lanterns.to_string(),
+                if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
+            ),
+        );
     if totals.skipped() > 0 {
         numbers = numbers.child(stat(k, "skipped", &totals.skipped().to_string(), "skipped"));
     }
@@ -288,14 +315,21 @@ pub fn view(l: &Ledger<'_>) -> El {
         body = body.child(el().h(14.0)).child(worked_on(l, &labels, totals.focused));
     }
     if totals.lanterns > 0 {
-        body = body.child(el().h(14.0)).child(felt(k, &totals));
+        body = body.child(el().h(14.0)).child(felt(k, &totals, l.wide));
     }
-    body = body.child(el().h(12.0)).child(history::view(l, today));
+    let weeks = history::view(l, today);
+    let body = if l.split {
+        row().key("today-body").pb(PAD).gap(GUTTER).items_start().child(body).child(weeks)
+    } else {
+        col().key("today-body").pb(PAD).child(body.child(el().h(12.0)).child(weeks))
+    };
     // Below the held top, the day scrolls in what is left of the window, and a tile or a lantern
     // reached by the keyboard scrolls into view.
     page.child(
         col()
             .key("today-scroll")
+            .w_full()
+            .items_center()
             .grow(1.0)
             .min_h(0.0)
             .scroll(ScrollSpec { stick_bottom: false })
@@ -307,7 +341,7 @@ pub fn view(l: &Ledger<'_>) -> El {
 
 /// What the strip's marks mean, in one row under it: a lantern, a ring and a knot, each drawn
 /// as the strip draws it, beside its word.
-fn key_row(k: Ink) -> El {
+fn key_row(k: Ink, wide: f32) -> El {
     let ink = k.text.alpha(0.82);
     let (lantern, _) = Lantern::light(Some(Felt::Deep));
     let mark = |key: &str, glyph: Shape, words: &str| {
@@ -331,8 +365,9 @@ fn key_row(k: Ink) -> El {
         .fill(ring([7.0, 6.0], [1.9, 1.9], 10, 0.0, std::f32::consts::TAU), ink);
     row()
         .key("strip-key")
-        .w(WIDE)
-        .gap(14.0)
+        .w(wide)
+        .gaps(6.0, 14.0)
+        .flex_wrap()
         .center_y()
         .child(mark("key-lantern", lit, "a block finished"))
         .child(mark("key-ring", skipped, "skipped, minutes kept"))
@@ -390,10 +425,10 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
     let lines = col()
         .key("detail-text")
         .gap(2.0)
-        .w(WIDE - HIT - 8.0)
+        .w(l.wide - HIT - 8.0)
         .child(label(k, &when(l.cal, b), 11.5, 520.0, 0.95).key("detail-when"))
         .child(
-            label(k, &about(b).join(" · "), 11.0, 460.0, 0.86).key("detail-about").max_w(WIDE - HIT - 8.0).truncate(),
+            label(k, &about(b).join(" · "), 11.0, 460.0, 0.86).key("detail-about").max_w(l.wide - HIT - 8.0).truncate(),
         );
     let mut edit = row().key("detail-edit").gap(5.0).center_y().flex_wrap();
     if b.finished() {
@@ -464,9 +499,9 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
     };
     col()
         .key("detail")
-        .w(WIDE)
+        .w(l.wide)
         .gap(6.0)
-        .child(row().w(WIDE).justify_between().items_start().child(lines).child(close))
+        .child(row().w(l.wide).justify_between().items_start().child(lines).child(close))
         .child(edit.child(name))
 }
 
@@ -481,7 +516,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
     let hours = |b: &Block| l.cal.hour_of(b.ended);
     let from = blocks.iter().map(|(_, b)| hours(b).floor() - 1.0).fold(8.0f32, f32::min);
     let to = blocks.iter().map(|(_, b)| hours(b).ceil() + 1.0).fold(20.0f32, f32::max);
-    let wide = WIDE.max(blocks.len() as f32 * SPREAD + 24.0);
+    let wide = l.wide.max(blocks.len() as f32 * SPREAD + 24.0);
     let x_of = |hr: f32| (hr - from) / (to - from) * wide;
     let mut xs: Vec<f32> = blocks.iter().map(|(_, b)| x_of(hours(b))).collect();
     for i in 1..xs.len() {
@@ -561,7 +596,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
             rings += 1;
         }
     }
-    el().key(STRIP).w(WIDE).scroll_x().child(
+    el().key(STRIP).w(l.wide).scroll_x().child(
         // Room under the hours, so the viewport never cuts the lanterns' reflections short.
         col()
             .w(wide)
@@ -595,7 +630,7 @@ fn worked_on(l: &Ledger<'_>, labels: &[(&str, u32)], total: u32) -> El {
     if other > 0 {
         rows.push(("other", other));
     }
-    rows.into_iter().fold(col().key("worked-on").gap(9.0).w(WIDE), |c, (name, secs)| {
+    rows.into_iter().fold(col().key("worked-on").gap(9.0).w(l.wide), |c, (name, secs)| {
         let time = duration(secs);
         let share = secs as f32 / total.max(1) as f32;
         c.child(
@@ -605,22 +640,22 @@ fn worked_on(l: &Ledger<'_>, labels: &[(&str, u32)], total: u32) -> El {
                 .help(format!("{name}: {time}"))
                 .child(
                     row()
-                        .w(WIDE)
+                        .w(l.wide)
                         .justify_between()
                         .child(
                             label(k, name, 11.5, 500.0, 0.95)
                                 .key(format!("for-name-{name}"))
-                                .max_w(WIDE - 80.0)
+                                .max_w(l.wide - 80.0)
                                 .truncate(),
                         )
                         .child(label(k, &time, 11.5, 480.0, 0.95)),
                 )
                 .child(
-                    el().w(WIDE)
+                    el().w(l.wide)
                         .h(3.0)
                         .radius(1.5)
                         .fill(k.text.alpha(0.12))
-                        .child(el().w(WIDE * share).h(3.0).radius(1.5).fill(k.text.alpha(0.62))),
+                        .child(el().w(l.wide * share).h(3.0).radius(1.5).fill(k.text.alpha(0.62))),
                 ),
         )
     })
@@ -628,7 +663,7 @@ fn worked_on(l: &Ledger<'_>, labels: &[(&str, u32)], total: u32) -> El {
 
 /// How the day's lanterns felt, in plain words, each with the lantern's own tone beside it: "2 deep,
 /// 1 steady, 1 not marked". A lantern left unanswered is counted as not marked, never guessed.
-fn felt(k: Ink, t: &Totals) -> El {
+fn felt(k: Ink, t: &Totals, wide: f32) -> El {
     let unmarked = t.lanterns - t.reflected();
     let parts: Vec<(&str, u32, Option<Felt>)> = Felt::ALL
         .iter()
@@ -638,8 +673,8 @@ fn felt(k: Ink, t: &Totals) -> El {
         .filter(|(_, n, _)| *n > 0)
         .collect();
     let said = parts.iter().map(|(word, n, _)| format!("{n} {word}")).collect::<Vec<_>>().join(", ");
-    let bar = parts.iter().fold(row().w(WIDE).gap(2.0), |r, &(_, n, felt)| {
-        let w = (WIDE - 2.0 * (parts.len() - 1) as f32) * n as f32 / t.lanterns as f32;
+    let bar = parts.iter().fold(row().w(wide).gap(2.0), |r, &(_, n, felt)| {
+        let w = (wide - 2.0 * (parts.len() - 1) as f32) * n as f32 / t.lanterns as f32;
         let part = el().w(w).h(5.0).radius(2.5);
         r.child(match felt {
             Some(f) => part.fill(Lantern::light(Some(f)).0),
@@ -675,7 +710,7 @@ pub fn backdrop(place: &Place, dark: bool) -> El {
     let (p, ground, veil, glow) =
         if dark { (place.pal(1.42), rgb(0x05060f), 0.42, 0.22) } else { (place.pal(0.32), rgb(0xfbf8f3), 0.7, 0.3) };
     let tone = |c: rune::Color| c.mix(ground, veil);
-    el().size(W, H)
+    el().pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .a11y_hidden()
         .linear_gradient(std::f32::consts::PI, [(0.0, tone(p.zen)), (0.55, tone(p.mid)), (1.0, tone(p.low))])
         .child(el().pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).radial_gradient(

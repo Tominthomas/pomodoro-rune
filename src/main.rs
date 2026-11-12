@@ -7,6 +7,7 @@ mod controls;
 mod demo;
 mod drawing;
 mod history;
+mod input;
 mod lantern;
 mod log;
 mod menu;
@@ -23,19 +24,19 @@ use std::time::Duration;
 
 use rune::prefs::Prefs;
 use rune::time::{SystemTime, UNIX_EPOCH};
-use rune::{
-    AppHandle, AppSpec, Cx, Drag, El, Key, KeyEvent, Phase as DragPhase, TextEdit, Transition, Tx, WindowOptions, el,
-};
+use rune::{AppHandle, AppSpec, Cx, El, TextEdit, Transition, Tx, el};
 
 use lantern::Lantern;
 use log::{Block, Calendar, Day, Felt};
 use scene::{Dawn, Scene, Sky};
 use store::Store;
 use study::Study;
-use theme::{H, PLACES, Place, W};
+use theme::{Frame, H, PLACES, Place, W};
 use timer::{Clock, Effect, Event, Lengths, Phase, RING, Timer};
 
 const APP_ID: &str = "dev.tomin.pomodoro";
+/// The name macOS saves the window's place and size under, between launches.
+const FRAME: &str = "pomodoro";
 /// Headless runs start on a fixed afternoon (Wednesday 11 November 2026, 14:00 UTC), so
 /// scripts and renders read the same everywhere.
 const HEADLESS_EPOCH: f64 = 1_794_405_600.0;
@@ -52,6 +53,8 @@ const ACTIVATING: f64 = 0.35;
 const ACKNOWLEDGED: f64 = 2.0;
 /// Left unanswered, the question fades this far into the break.
 const ASK_FOR: f64 = 30.0;
+/// How much bigger Larger Text draws the words and every control: the view's zoom.
+const LARGER: f32 = 1.25;
 /// Quitting waits this long at most for the last save.
 const CLOSE_WAIT: Duration = Duration::from_secs(2);
 
@@ -137,6 +140,12 @@ pub struct State {
     /// forward or putting the name field away, so it does nothing else.
     spent: bool,
     visible: bool,
+    /// macOS has been asked to remember the window's frame; it can't be before the window exists.
+    framed: bool,
+    /// Larger Text is on: words and controls are drawn bigger, the scene as it is.
+    larger: bool,
+    /// The window's size in its own points, as the last view laid it out.
+    window: Cell<(f32, f32)>,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
     /// block's morning comes up from there.
     dawn_from: Option<(f64, Dawn)>,
@@ -176,6 +185,8 @@ fn init(handle: AppHandle<State>) -> State {
         }
     });
     s.menu_bar = Some(menu_bar);
+    // A headless run has no window to remember.
+    s.framed = headless;
     s
 }
 
@@ -190,12 +201,13 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
     let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
+    let larger = prefs.get::<bool>("larger-text").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.cue_marks, s.place) = (hint, cue_marks, place);
+    (s.hint, s.cue_marks, s.place, s.larger) = (hint, cue_marks, place, larger);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -235,6 +247,9 @@ impl State {
             activated_at: f64::NEG_INFINITY,
             spent: false,
             visible: true,
+            framed: false,
+            larger: false,
+            window: Cell::new((W, H)),
             dawn_from: None,
             reduced: Cell::new(false),
             store,
@@ -351,6 +366,11 @@ impl State {
         self.store.set(study::KEY, self.study.clone());
     }
 
+    /// How much the view is zoomed: Larger Text, or not.
+    fn zoom(&self) -> f32 {
+        if self.larger { LARGER } else { 1.0 }
+    }
+
     /// A block was opened from Today, so its marks no longer need the cue.
     fn learned_marks(&mut self) {
         if self.cue_marks {
@@ -433,18 +453,21 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
 }
 
 fn notify(finished: Phase) {
-    if !rune_notify::available() || rune_notify::app_focused() {
+    if !rune_mac::notify::available() || rune_mac::notify::app_focused() {
         return;
     }
     let (title, body) = match finished {
         Phase::Focus => ("A lantern for that one", "The sun's down. Rest a while."),
         Phase::Short | Phase::Long => ("Break's over", "Press start when you're ready for the next sunset."),
     };
-    rune_notify::post(&rune_notify::Notification::new("phase", title).body(body));
+    rune_mac::notify::post(&rune_mac::notify::Notification::new("phase", title).body(body));
 }
 
 fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
     s.now = now;
+    if !s.framed {
+        s.framed = rune_mac::remember_frame(FRAME);
+    }
     let mut changed = false;
     if let Some(timer) = s.study.roll_over(s.cal, s.unix(), &s.timer) {
         s.timer = timer;
@@ -491,6 +514,18 @@ fn describe_block(s: &mut State, serial: u64, change: impl FnOnce(&mut Block)) {
     }
 }
 
+/// Turns Larger Text on or off. On, a window too small to hold the bigger words grows until it
+/// does; it can still be made smaller again, and the words then wrap.
+fn set_larger(s: &mut State, on: bool, tx: &mut Tx) {
+    s.larger = on;
+    s.store.set("larger-text", on);
+    let (w, h) = s.window.get();
+    let fits = (W * LARGER, H * LARGER);
+    if on && (w < fits.0 || h < fits.1) {
+        tx.resize_window((w.max(fits.0), h.max(fits.1)));
+    }
+}
+
 fn set_place(s: &mut State, index: usize, tx: &mut Tx) {
     s.place = index % PLACES.len();
     tx.color_motion(rune::tok::motion::CALM);
@@ -527,126 +562,18 @@ fn open_today(s: &mut State, open: bool, tx: &mut Tx) {
     }
 }
 
-/// Escape closes whatever is open, innermost first.
-fn escape(s: &mut State, tx: &mut Tx) -> bool {
-    if s.editing {
-        finish_label(s, false, tx);
-    } else if s.keys_open {
-        s.keys_open = false;
-    } else if let Page::Today(nav) = &mut s.page {
-        if !nav.escape() {
-            open_today(s, false, tx);
-        }
-    } else if s.asking() != Asking::Hidden {
-        s.reflect = None;
-    } else if s.keyboard {
-        s.keyboard = false;
-    } else {
-        return false;
-    }
-    true
-}
-
-fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
-    let now = tx.clock();
-    if e.key == Key::Escape {
-        return escape(s, tx);
-    }
-    if e.is_command('z') {
-        carry(s, Event::Undo { now }, tx);
-        return true;
-    }
-    if let (true, Key::Text(t)) = (s.editing, &e.key) {
-        // A name is being typed, so letters are words, never shortcuts. Only a field that lost
-        // focus lets one reach here: it takes the letter and focus back.
-        s.label.insert(t);
-        s.label.focused = true;
-        tx.focus("label-field", false);
-        return true;
-    }
-    if e.key == Key::Tab && tx.focused().is_none() && matches!(s.page, Page::Scene) && !s.keyboard {
-        // Tab brings the controls out first, so focus never lands on something unseen.
-        s.keyboard = true;
-        tx.focus("control-play", true);
-        return true;
-    }
-    let event = match &e.key {
-        Key::Text(t) if t == " " => Event::Press { now },
-        Key::Up | Key::Right => Event::Nudge { minutes: 1 },
-        Key::Down | Key::Left => Event::Nudge { minutes: -1 },
-        Key::Text(t) => match t.to_ascii_lowercase().as_str() {
-            "s" => Event::Skip { now },
-            "u" => Event::Undo { now },
-            "h" => {
-                open_today(s, matches!(s.page, Page::Scene), tx);
-                return true;
-            }
-            "t" => {
-                set_place(s, s.place + 1, tx);
-                return true;
-            }
-            "l" => {
-                edit_label(s, tx);
-                return true;
-            }
-            "?" | "/" => {
-                s.keys_open = !s.keys_open;
-                return true;
-            }
-            n @ ("1" | "2" | "3") if s.asking() == Asking::Open => {
-                rate(s, Felt::ALL[n.parse::<usize>().unwrap_or(1) - 1], tx);
-                return true;
-            }
-            _ => return false,
-        },
-        _ => return false,
-    };
-    carry(s, event, tx);
-    true
-}
-
-/// A tap on the sky starts or pauses; dragging up or down while the block waits raises or
-/// lowers the sun, which sets the block's length, and letting go keeps it, waiting for a press
-/// as the arrow keys do. The click that brings the window forward does neither.
-fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
-    let now = tx.clock();
-    match d.phase {
-        DragPhase::Down => {
-            d.data = d.y;
-            s.spent = s.activating_press(tx);
-            if s.editing {
-                // A click on the sky while naming keeps the name.
-                finish_label(s, true, tx);
-                s.spent = true;
-            }
-        }
-        DragPhase::Move => {
-            let scrubbing = matches!(s.timer.clock, Clock::Scrubbing { .. });
-            if !scrubbing && (s.spent || d.dx.hypot(d.dy) < SLOP || s.timer.clock != Clock::Wound) {
-                return;
-            }
-            let from = match s.timer.clock {
-                Clock::Scrubbing { secs } => secs,
-                _ => f64::from(s.timer.length()),
-            };
-            let to = scene::length_at(scene::rise(from) + f64::from(d.data - d.y));
-            d.data = d.y;
-            carry(s, Event::Scrub { secs: to - from }, tx);
-        }
-        DragPhase::Up if matches!(s.timer.clock, Clock::Scrubbing { .. }) => carry(s, Event::Release, tx),
-        DragPhase::Up if !s.spent && !d.cancelled() && d.dx.hypot(d.dy) < SLOP => {
-            carry(s, Event::Press { now }, tx);
-        }
-        DragPhase::Up => {}
-    }
-}
-
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
     menu::sync(s);
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
+    // The window as the last layout found it; before the first, the size it opens at.
+    // Larger Text zooms the whole view; the scene alone is drawn back at the window's own scale.
+    let zoom = s.zoom();
+    cx.zoom(zoom);
+    let frame = cx.layout_size("window").map_or(Frame::of(W / zoom, H / zoom), |[w, h]| Frame::of(w, h));
+    s.window.set((frame.w * zoom, frame.h * zoom));
     let (water, stars) = s.lanterns();
     // Reduce Motion: a bell or a dawn shows only where it ends.
     let mut sky = Sky::of(&s.timer, s.now, s.dawn().filter(|_| !s.reduced.get()));
@@ -664,9 +591,10 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         water: &water,
         stars: &stars,
         held: matches!(s.timer.clock, Clock::Paused { .. }),
+        frame: Frame::of(frame.w * zoom, frame.h * zoom),
     };
-    let root =
-        el().size(W, H).clip_rounded(0.0).window_drag().on_pointer_move_local(|s: &mut State, _, tx: &mut Tx| {
+    let root = el().key("window").w_full().h_full().clip_rounded(0.0).window_drag().on_pointer_move_local(
+        |s: &mut State, _, tx: &mut Tx| {
             let shown = s.beckoned();
             s.keyboard = false;
             s.controls_until = tx.clock() + CONTROLS_LINGER;
@@ -674,7 +602,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
             if shown {
                 tx.live_only();
             }
-        });
+        },
+    );
     let page = match &s.page {
         Page::Scene => {
             // One sky through every phase: each boundary is continuous, the bell easing into the
@@ -683,22 +612,27 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .key("sky")
                 .role("none")
                 .absolute(0.0, 0.0)
-                .size(W, H)
-                .on_drag(drag)
-                .child(scene::view(&scene).key("scene").absolute(0.0, 0.0));
+                .size(frame.w, frame.h)
+                .on_drag(input::drag)
+                .child(scene::view(&scene).key("scene").absolute(0.0, 0.0).origin(0.0, 0.0).scale(1.0 / zoom));
             let k = theme::Ink::on(scene::ground(&scene));
             // The phase line already says it on the scene, so here the status is only heard.
             let status =
                 readout::status(s, k, news).filter(|_| !s.keys_open).map(|e| e.opacity(1.0).color(k.text.alpha(0.0)));
-            let root = root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k));
+            let root = root
+                .child(sky)
+                .child(readout::scrim(k, frame))
+                .child(readout::view(s, k, frame))
+                .child(controls::view(s, k, frame));
             match status {
-                Some(e) => root.child(e.absolute(24.0, H - 184.0)),
+                Some(e) => root.child(e.absolute(24.0, frame.h - readout::top(frame))),
                 None => root,
             }
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
             let ink = if dark { theme::Ink::light() } else { theme::Ink::dark() };
+            let (wide, split) = today::columns(frame);
             let ledger = today::Ledger {
                 log: &s.study.log,
                 cal: s.cal,
@@ -711,6 +645,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 status: readout::status(s, ink, news).filter(|_| !s.keys_open),
                 unsaved: readout::save_status(s, ink),
                 cue: s.cue_marks,
+                wide,
+                split,
                 timer: &s.timer,
                 clock: s.now,
             };
@@ -718,7 +654,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .child(today::view(&ledger).key("ledger").transition(Transition::blur_replace()))
         }
     };
-    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news))) } else { page }
+    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news), frame)) } else { page }
 }
 
 /// The window became the key window or stopped being it.
@@ -731,18 +667,20 @@ fn on_focus(s: &mut State, key: bool, tx: &mut Tx) {
 
 fn main() {
     rune::prewarm_gpu();
+    // The window opens at the size it last had, so it doesn't open small and then grow; a
+    // headless run always renders at the size it is given.
+    let size = if rune::tooling::headless_run().is_some() { None } else { rune_mac::saved_size(FRAME) };
     let app = rune::App::new(AppSpec::<State> {
         scenes: demo::SCENES,
         fonts: &[include_bytes!("../assets/fonts/Inter.ttf")],
         families: ("Inter", "Inter"),
         poll: Some(poll),
-        on_key: Some(on_key),
+        on_key: Some(input::on_key),
         min_size: Some((W, H)),
-        ..AppSpec::new("Pomodoro", (W, H), || unreachable!("App::init builds the state"), view)
+        ..AppSpec::new("Pomodoro", size.unwrap_or((W, H)), || unreachable!("App::init builds the state"), view)
     });
     let handle = app.handle();
     app.init(move || init(handle))
-        .window_options(WindowOptions { resizable: false, ..WindowOptions::default() })
         .on_visibility(|s: &mut State, shown, _| s.visible = shown)
         .on_focus(on_focus)
         .on_close(|s: &mut State, _| {

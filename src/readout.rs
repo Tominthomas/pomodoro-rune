@@ -6,8 +6,9 @@
 use rune::tok::TextStyle;
 use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, col, el, row, text, text_input};
 
+use crate::controls;
 use crate::log::{self, Felt};
-use crate::theme::{H, Ink, W};
+use crate::theme::{Frame, Ink};
 use crate::timer::{CYCLE, Clock, Event, Phase, Timer};
 use crate::{Asking, State, carry, edit_label, finish_label, guarded, rate};
 
@@ -19,8 +20,11 @@ pub const QUIET: f32 = 0.86;
 pub const DISPLAY: f32 = 30.0;
 pub const LEAD: f32 = 13.0;
 pub const SMALL: f32 = 11.5;
-/// Where the readout's first line sits.
-const TOP: f32 = H - 184.0;
+/// How far above the window's bottom the readout's first line sits: higher when the dock
+/// below it takes two rows.
+pub fn top(f: Frame) -> f32 {
+    if controls::two_rows(f) { 184.0 + controls::SECOND_ROW } else { 184.0 }
+}
 /// How wide a label may run before it's cut with an ellipsis.
 const LABEL_W: f32 = 230.0;
 /// The smallest a target is under the pointer, whatever it draws.
@@ -56,12 +60,23 @@ pub fn pill(k: Ink, label: &str) -> El {
 
 /// The soft shade the readout sits on, darkest at the window's corner. Dark ink already reads
 /// on pale water, so its light shade stays faint: enough to quiet the texture, never a fog.
-pub fn scrim(k: Ink) -> El {
+pub fn scrim(k: Ink, f: Frame) -> El {
     let shade = k.shade;
     let a = if k == Ink::dark() { 0.4 } else { 1.0 };
-    el().key("scrim").absolute(0.0, H - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
-        [0.05, 0.85],
-        [340.0, 225.0],
+    if controls::two_rows(f) {
+        // Narrow, the readout rises into the sky and over the land, so the shade rises with it,
+        // across the window, and is as strong for dark ink as for light.
+        let a = 1.0;
+        let reach = top(f) + 60.0;
+        return el().key("scrim").absolute(0.0, f.h - reach).size(f.w, reach).a11y_hidden().linear_gradient(
+            std::f32::consts::PI,
+            [(0.0, shade.alpha(0.0)), (0.14, shade.alpha(0.66 * a)), (1.0, shade.alpha(0.74 * a))],
+        );
+    }
+    // Tall enough that the readout's first line, the highest, still sits in the shade.
+    el().key("scrim").absolute(0.0, f.h - 320.0).size(350.0, 320.0).a11y_hidden().radial_gradient(
+        [0.05, 0.87],
+        [340.0, 265.0],
         [
             (0.0, shade.alpha(0.62 * a)),
             (0.5, shade.alpha(0.5 * a)),
@@ -159,12 +174,12 @@ pub fn status(s: &State, k: Ink, news: bool) -> Option<El> {
     )
 }
 
-pub fn view(s: &State, k: Ink) -> El {
+pub fn view(s: &State, k: Ink, f: Frame) -> El {
     let t = &s.timer;
     let resting = t.phase != Phase::Focus;
     // Anchored at its top, so the time holds still whatever is offered under it. The top line
     // and the phase line keep one key each, so a change replaces the words in place.
-    let mut out = col().key("readout").absolute(24.0, TOP).w(W - 48.0).gap(3.0).items_start();
+    let mut out = col().key("readout").absolute(24.0, f.h - top(f)).w(f.w - 48.0).gap(3.0).items_start();
     if resting {
         // During a break the top line is about the block just done, not the next one. It keeps
         // the label's shape, so the words change in place and never cross-fade over each other.
@@ -180,7 +195,9 @@ pub fn view(s: &State, k: Ink) -> El {
     } else {
         out = out.child(label(s, k));
     }
-    out = out.child(time_row(s, k)).child(line(k, phase_line(s), SMALL, 460.0, QUIET).key("phase"));
+    out = out
+        .child(time_row(s, k))
+        .child(line(k, phase_line(s), SMALL, 460.0, QUIET).key("phase").max_w(f.w - 48.0).wrap());
     let mut offers = col().key("offers").gap(6.0).items_start();
     if s.teaching() {
         offers = offers.child(

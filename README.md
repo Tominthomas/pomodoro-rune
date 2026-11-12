@@ -68,9 +68,14 @@ Press `?` in the app to see these. The Timer, View and Help menus in the menu ba
 | `1` `2` `3` | How the block felt: deep, steady, or drifting |
 | `H` | Today and the last four weeks |
 | `T` | The next place |
+| `⌘+` `⌘−` | Larger text, or back to the usual size (also View > Larger Text) |
 | `Tab` | Show the controls |
 | `?` | All the keys |
 | `Esc` | Close whatever is open |
+
+## Any size
+
+Drag the window's corner to make it bigger. The sky and the sea fill it, and the time and the controls keep their corners. A wide window shows Today's four weeks beside the day. The app remembers the size between launches. Larger Text in the View menu (`⌘+`) makes the words and controls bigger and leaves the sunset as it is.
 
 ## Three places
 
@@ -106,7 +111,7 @@ target/release/pomodoro --list-scenes
 target/release/pomodoro --scene bell --theme dark --snap bell.png --at 2
 ```
 
-The Rust tests in `src/tests.rs` drive the same view and key handlers through Rune's `Runtime`, which needs no GPU. They press keys, click the sky, run blocks to their end, and relaunch from what was saved, and they fail if the time or the phase line is drawn too faint to read.
+The Rust tests in `src/tests/` drive the same view and key handlers through Rune's `Runtime`, which needs no GPU. They press keys, click the sky, run blocks to their end, and relaunch from what was saved, and they fail if the time or the phase line is drawn too faint to read.
 
 `tools/ci.sh` runs every check in order: `cargo fmt`, spelling with `typos`, TOML formatting with `taplo`, unused dependencies with `cargo machete`, advisories, licenses and sources with `cargo deny`, file and folder size limits in `tools/shape.py`, `clippy`, the docs, the Rust tests, `ruff`, a check that `scripts/` matches `tools/scripts.py`, and the headless checks. CI installs the pinned versions of `typos`, `taplo`, `cargo machete` and `cargo deny`. Locally, the script skips any of them you haven't installed and says so. The headless checks need a Mac with a Metal GPU, `ffmpeg`, and `numpy`. GitHub Actions runs everything except the headless checks, because its macOS runners haven't been shown to render the app. `tools/readme-media.sh` regenerates the images on this page.
 

@@ -29,6 +29,32 @@ def mark(t, name):
     return {"t": t, "type": "mark", "name": name}
 
 
+def sized(larger=False, small=False):
+    """One journey through a window of another size (tools/check.py gives the size): the waiting
+    block, the block running with the controls out, the keys, Today, and Today scrolled to the
+    four weeks. With `larger`, Larger Text first; with `small` too, the window it grew is then
+    made the smallest again."""
+    start = []
+    if larger:
+        start.append({"t": 0.1, "type": "key", "name": "=", "cmd": True})
+    if small:
+        start += [mark(0.5, "grown"), {"t": 0.6, "type": "resize", "dw": -95, "dh": -135, "dur": 0.05}]
+    return [
+        *start,
+        mark(1.0, "waiting"),
+        key(1.1, " "),
+        {"t": 1.3, "type": "move", "x": 150.0, "y": 150.0},
+        mark(2.2, "running"),
+        key(2.3, "?"),
+        mark(2.8, "keys"),
+        key(2.9, "Escape"),
+        key(3.0, "h"),
+        mark(3.6, "today"),
+        {"t": 3.7, "type": "wheel", "x": 150.0, "y": 300.0, "dy": -3000},
+        mark(5.0, "history"),
+    ]
+
+
 def one_minute(t):
     """Winds a focus block down from 25 minutes to one."""
     return [key(t + 0.02 * i, "Down") for i in range(24)]
@@ -269,6 +295,10 @@ SCRIPTS = {
         {"t": 5.0, "menu": "help-keys"},
         mark(5.4, "keys"),
     ],
+    "size-tall": sized(),
+    "size-wide": sized(),
+    "size-larger": sized(larger=True),
+    "size-larger-small": sized(larger=True, small=True),
     # A label longer than the window has room for.
     "long-label": [*label(0.1, "Thermodynamics problem set, chapter seven, the long derivations"), mark(4.5, "end")],
 }
