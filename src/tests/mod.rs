@@ -185,14 +185,33 @@ impl App {
     /// The text of the element keyed `key`, if it is on screen. Present but too faint to read
     /// fails the test: what a person must read has to be drawn readable.
     fn read(&self, key: &str) -> Option<String> {
-        let e = self.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key) && !e.exiting)?;
-        let ink = e.text_color.map_or(1.0, |c| c.a) * e.opacity;
-        assert!(ink >= READABLE, "{key} {:?} is drawn too faint to read: {ink}", e.text);
-        e.text
+        let (text, ink) = self.drawn(key)?;
+        assert!(ink >= READABLE, "{key} {text:?} is drawn too faint to read: {ink}");
+        text
     }
 
+    /// The text of the element keyed `key`, if it is on screen, and how opaque it is drawn: its
+    /// colour's alpha times the opacity it inherits.
+    fn drawn(&self, key: &str) -> Option<(Option<String>, f32)> {
+        let e = self.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key) && !e.exiting)?;
+        Some((e.text, e.text_color.map_or(1.0, |c| c.a) * e.opacity))
+    }
+
+    /// The time the readout holds. Drawn, it must be readable; while a focus block runs uncalled it
+    /// is hidden outright, never half there.
     fn time(&self) -> String {
-        self.read("time").unwrap_or_default()
+        let s = &self.rt.state;
+        if readout::digits_shown(s.timer.phase, &s.timer.clock, s.beckoned(), s.always_time) {
+            return self.read("time").unwrap_or_default();
+        }
+        let (text, ink) = self.drawn("time").unwrap_or_default();
+        assert!(ink == 0.0, "hidden digits are drawn at {ink}");
+        text.unwrap_or_default()
+    }
+
+    /// Whether the digits are drawn for a person to read.
+    fn digits(&self) -> bool {
+        self.drawn("time").is_some_and(|(_, ink)| ink >= READABLE)
     }
 
     fn phase(&self) -> String {
@@ -253,6 +272,7 @@ impl App {
     }
 }
 
+mod digits;
 mod dock;
 mod ledger;
 mod sunset;

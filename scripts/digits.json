@@ -1,0 +1,59 @@
+{
+ "events": [
+  {
+   "t": 0.2,
+   "type": "mark",
+   "name": "waiting"
+  },
+  {
+   "t": 0.4,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 3.0,
+   "type": "mark",
+   "name": "hidden"
+  },
+  {
+   "t": 3.2,
+   "type": "move",
+   "x": 200.0,
+   "y": 300.0
+  },
+  {
+   "t": 3.8,
+   "type": "mark",
+   "name": "called"
+  },
+  {
+   "t": 6.5,
+   "type": "mark",
+   "name": "rested"
+  },
+  {
+   "t": 6.6,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 7.2,
+   "type": "mark",
+   "name": "paused"
+  },
+  {
+   "t": 7.4,
+   "menu": "view-always-time"
+  },
+  {
+   "t": 7.6,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 11.0,
+   "type": "mark",
+   "name": "always"
+  }
+ ]
+}

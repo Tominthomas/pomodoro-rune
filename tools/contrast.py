@@ -7,7 +7,9 @@ For each text element it crops the render to the element's box and compares the 
 (the median), as WCAG relative luminance. Every
 text in sight is measured as drawn, however faint. Text drawn invisible is left out: the controls
 while they have receded, and the bell's words on the scene, which are there for VoiceOver. The time
-and the phase line must be on every scene but Today. Prints the lowest per scene and overall.
+and the phase line must be on every scene but Today; a running focus block hides the time until the
+pointer calls it out, so its moments are shot with the pointer just moved. Prints the lowest per
+scene and overall.
 
     cargo build --release && python3 tools/contrast.py [NAME ...]
 
@@ -52,6 +54,8 @@ UNSEEN = 0.05
 # How far Today's scrolling edges fade, in points (src/today.rs).
 FADE = 18.0
 REQUIRED = ("time", "phase")
+# The moments of a running focus block, whose digits show only once the pointer moves.
+CALLED = ("focus-early", "focus-late", "evening")
 
 
 def luminance(rgb):
@@ -64,6 +68,8 @@ def render(d, place, theme, scene, size="380x540", larger=False):
     """The render at 2x and its elements. Larger Text grows a window that is too small for it, so
     in the smallest window it is turned on and the window then made small again."""
     events = [{"t": 0.05 + 0.02 * i, "type": "key", "name": "t"} for i in range(place)]
+    if scene in CALLED:
+        events.append({"t": 0.12, "type": "move", "x": 200.0, "y": 300.0})
     if larger:
         events.append({"t": 0.1, "type": "key", "name": "=", "cmd": True})
         if size == "380x540":

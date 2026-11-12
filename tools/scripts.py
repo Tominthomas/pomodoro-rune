@@ -150,6 +150,21 @@ SCRIPTS = {
         mark(1.4, "shown"),
         mark(4.6, "rested"),
     ],
+    # The digits step back while a block runs: the pointer calls them out, and they stay while it
+    # is paused, and through the block once the View menu says always.
+    "digits": [
+        mark(0.2, "waiting"),
+        key(0.4, " "),
+        mark(3.0, "hidden"),
+        {"t": 3.2, "type": "move", "x": 200.0, "y": 300.0},
+        mark(3.8, "called"),
+        mark(6.5, "rested"),
+        key(6.6, " "),
+        mark(7.2, "paused"),
+        {"t": 7.4, "menu": "view-always-time"},
+        key(7.6, " "),
+        mark(11.0, "always"),
+    ],
     # A block skipped and taken straight back runs on to its bell as one block.
     "undo": [
         *one_minute(0.1),

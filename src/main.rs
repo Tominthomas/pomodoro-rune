@@ -144,6 +144,8 @@ pub struct State {
     framed: bool,
     /// Larger Text is on: words and controls are drawn bigger, the scene as it is.
     larger: bool,
+    /// "Always show time" is on: the digits stay in sight while a focus block runs.
+    always_time: bool,
     /// The window's size in its own points, as the last view laid it out.
     window: Cell<(f32, f32)>,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
@@ -202,12 +204,13 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
     let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
     let larger = prefs.get::<bool>("larger-text").unwrap_or(false);
+    let always_time = prefs.get::<bool>("always-show-time").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.cue_marks, s.place, s.larger) = (hint, cue_marks, place, larger);
+    (s.hint, s.cue_marks, s.place, s.larger, s.always_time) = (hint, cue_marks, place, larger, always_time);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -249,6 +252,7 @@ impl State {
             visible: true,
             framed: false,
             larger: false,
+            always_time: false,
             window: Cell::new((W, H)),
             dawn_from: None,
             reduced: Cell::new(false),
@@ -524,6 +528,11 @@ fn set_larger(s: &mut State, on: bool, tx: &mut Tx) {
     if on && (w < fits.0 || h < fits.1) {
         tx.resize_window((w.max(fits.0), h.max(fits.1)));
     }
+}
+
+fn set_always_time(s: &mut State, on: bool) {
+    s.always_time = on;
+    s.store.set("always-show-time", on);
 }
 
 fn set_place(s: &mut State, index: usize, tx: &mut Tx) {
