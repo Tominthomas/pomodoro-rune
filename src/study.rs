@@ -144,7 +144,7 @@ mod tests {
     use crate::log::{Felt, Summary, Totals};
     use crate::timer::{Event, Outcome};
 
-    const UTC: Calendar = Calendar { fixed_offset: Some(0) };
+    const UTC: Calendar = Calendar::UTC;
     /// 2026-11-11 00:00 UTC.
     const WED: i64 = 1_794_355_200;
     const H: i64 = 3600;

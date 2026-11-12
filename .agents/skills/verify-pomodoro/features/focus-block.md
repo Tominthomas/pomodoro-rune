@@ -12,7 +12,7 @@ A focus block is one sunset. The user can name it, then starts it, and the sun s
 
 ## How to get to it (user POV)
 
-- Tap the sky, or press Space, while the phase line reads `focus · space to begin`.
+- Tap the sky, press Space, or click `Start focus` (`control-play`) while the phase line reads `focus · space to begin`. On a first launch it reads `focus · click the sky or press space to begin`.
 - Move the pointer or press Tab, then click the play control (`control-play`, labelled `Start`).
 - Press `L`, type a name and press Enter to name the block before starting.
 - After the bell, press `1` (deep), `2` (steady) or `3` (drifting), or click a word under the question.
@@ -36,7 +36,7 @@ Preconditions:
 ## Gotchas
 
 - `cycle.json` is five minutes of virtual time. At `--fps 60` it takes far longer to render and gives the same answers, so use `--fps 10`.
-- `top-text` is always in the tree. Before a block is named it reads `+ name this block` and is drawn at ink 0 unless the controls show. Check `ink`, not presence.
+- `top-text` is always in the tree. Before a block is named it reads `+ name this block`, drawn while the block waits and at ink 0 once it runs. Check `ink`, not presence.
 - `1`, `2` and `3` only rate while the question is open. Pressed at other times they do nothing, and a test that presses them early still passes on presence alone.
 - The bell is silent by design. There is no sound to verify.
 - A notification at the bell is only posted when the window isn't in front and the app runs as a bundle. Headless can't show it. See SKILL.md's "Real window".

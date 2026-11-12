@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::*;
 
-const UTC: Calendar = Calendar { fixed_offset: Some(0) };
+const UTC: Calendar = Calendar::UTC;
 /// One frame at 60 fps: how long a key or a tap takes to land.
 const STEP: f64 = 1.0 / 60.0;
 /// Text a person must read is drawn at least this opaque, its colour's alpha times the opacity
@@ -67,6 +67,15 @@ impl App {
         App { rt, disk: disk.clone() }
     }
 
+    /// Opens the window on one of the review scenes, as `--scene` does.
+    fn scene(name: &str) -> App {
+        let mut app = App::new();
+        let (_, setup) = demo::SCENES.iter().find(|(n, _)| *n == name).unwrap_or_else(|| panic!("{name} is a scene"));
+        app.rt.update(|s, _| setup(s));
+        app.look();
+        app
+    }
+
     /// Quits, waiting for the last save, and opens the app again `later` seconds on.
     fn relaunch(&self, later: f64) -> App {
         assert_eq!(self.rt.state.store.flush(Duration::from_secs(5)), Ok(()), "the last save is written");
@@ -119,6 +128,12 @@ impl App {
         self.wait(STEP);
     }
 
+    /// Presses the element keyed `key` as `VoiceOver` does, through its accessibility action.
+    fn voiceover_press(&mut self, key: &str) {
+        assert!(self.rt.accessibility_action(key, rune::accesskit::Action::Click, None), "{key} takes a press");
+        self.wait(STEP);
+    }
+
     /// Sets the waiting block to one minute with the arrow keys, as the headless scripts do.
     fn one_minute(&mut self) {
         for _ in 0..24 {
@@ -162,6 +177,45 @@ impl App {
         self.rt.find(key).is_some()
     }
 
+    /// The accessibility node keyed `key`, as `VoiceOver` is given it: role, name, value, actions.
+    fn node(&self, key: &str) -> Option<Value> {
+        let mut stack = vec![self.rt.accessibility_json()];
+        while let Some(mut n) = stack.pop() {
+            if n["key"] == key {
+                return Some(n);
+            }
+            if let Value::Array(children) = n["children"].take() {
+                stack.extend(children);
+            }
+        }
+        None
+    }
+
+    /// The status `VoiceOver` announces, and whether it is news: marked to be read out now.
+    fn status(&self) -> Option<(String, bool)> {
+        let tree = self.rt.accessibility_tree();
+        let (_, n) = tree.nodes.iter().find(|(_, n)| n.author_id() == Some("status"))?;
+        Some((n.label().unwrap_or_default().to_string(), n.live() == Some(rune::accesskit::Live::Polite)))
+    }
+
+    /// The element holding keyboard focus: its key, and where it is drawn.
+    fn focused(&self) -> Option<(String, [f32; 4])> {
+        self.rt.elements().into_iter().find(|e| e.focused).map(|e| (e.key.unwrap_or_default(), e.rect))
+    }
+
+    /// Presses Tab until focus lands on an element whose key is `wanted`, and says where it is
+    /// drawn once the window is still.
+    fn tab_to(&mut self, wanted: impl Fn(&str) -> bool) -> [f32; 4] {
+        for _ in 0..80 {
+            if self.focused().is_some_and(|(k, _)| wanted(&k)) {
+                self.look();
+                return self.focused().map(|(_, rect)| rect).unwrap_or_default();
+            }
+            self.key(Key::Tab);
+        }
+        panic!("Tab never reaches it");
+    }
+
     /// The lanterns floating on the water.
     fn lanterns(&self) -> usize {
         (0..=timer::CYCLE).take_while(|i| self.has(&format!("lantern-{i}"))).count()
@@ -171,13 +225,18 @@ impl App {
 #[test]
 fn space_starts_pauses_and_resumes_the_sunset() {
     let mut app = App::new();
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · space to begin".into()));
+    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
     app.space();
     app.wait(2.0);
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
     app.space();
     app.wait(5.0);
-    assert_eq!((app.time(), app.phase()), ("24:58".into(), "paused · space to resume".into()), "held where it was");
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("24:58".into(), "the sky waits · space to resume".into()),
+        "held where it was"
+    );
+    assert_eq!(app.read("time-unit").as_deref(), Some("paused"), "and says so beside the time");
     app.space();
     app.wait(1.0);
     assert_eq!((app.time(), app.phase()), ("24:57".into(), "focus".into()));
@@ -191,7 +250,7 @@ fn a_tap_on_the_sky_starts_pauses_and_resumes_it_too() {
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
     app.tap("sky");
     app.wait(3.0);
-    assert_eq!(app.phase(), "paused · space to resume");
+    assert_eq!(app.phase(), "the sky waits · space to resume");
     app.tap("sky");
     app.wait(1.0);
     assert_eq!((app.time(), app.phase()), ("24:57".into(), "focus".into()));
@@ -220,6 +279,9 @@ fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
     assert_eq!(app.time(), "01:00");
     app.run_to_bell();
     assert_eq!((app.time(), app.phase()), ("1 min".into(), "a lantern for that one".into()));
+    assert_eq!(app.read("time-unit").as_deref(), Some("focused"), "what the minute was, not what is left");
+    let time = app.node("time").unwrap();
+    assert_eq!((&time["name"], &time["value"]), (&"Block complete".into(), &"1 minute focused".into()));
     assert_eq!(app.lanterns(), 1);
     assert_eq!(app.read("reflect-question").as_deref(), Some("How did that block feel? Optional."));
     app.wait(RING + 0.5);
@@ -298,12 +360,16 @@ fn today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first() {
     app.look();
     assert!(!app.has("detail") && app.has("today-title"), "then the block");
     let yesterday = UTC.day_of(HEADLESS_EPOCH as i64).0 - 1;
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
     app.tap(&format!("day-{yesterday}"));
     app.look();
     assert_eq!(app.read("today-title").as_deref(), Some("Tuesday"));
     app.tap("back-to-today");
     app.look();
     assert_eq!(app.read("today-title").as_deref(), Some("Today"));
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
     app.tap(&format!("day-{yesterday}"));
     app.key(Key::Escape);
     app.look();
@@ -329,18 +395,18 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("sky");
     app.wait(1.0);
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · space to begin".into()));
+    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
     app.tap("sky");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus", "the next click does");
     app.rt.update(|s, tx| on_focus(s, false, tx));
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.space();
-    assert_eq!(app.phase(), "paused · space to resume", "keys always act");
+    assert_eq!(app.phase(), "the sky waits · space to resume", "keys always act");
 }
 
 #[test]
-fn the_activating_click_on_a_hover_control_does_nothing_either() {
+fn the_activating_click_on_a_control_does_nothing_either() {
     let mut app = App::new();
     app.rt.pointer_move(300.0, 510.0);
     app.rt.update(|s, tx| on_focus(s, false, tx));
@@ -348,7 +414,7 @@ fn the_activating_click_on_a_hover_control_does_nothing_either() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "focus · space to begin");
+    assert_eq!(app.phase(), "focus · click the sky or press space to begin");
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");
@@ -389,17 +455,16 @@ fn skipping_the_long_break_in_the_second_it_starts_begins_a_new_cycle_once() {
 }
 
 #[test]
-fn the_offer_to_name_a_block_shows_only_with_the_controls() {
+fn the_offer_to_name_a_block_shows_while_it_waits() {
     let mut app = App::new();
     let ink = |app: &App| {
         let e = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("top-text")).unwrap();
         e.text_color.map_or(1.0, |c| c.a) * e.opacity
     };
-    assert!(ink(&app) < 0.01, "a hover offer is hidden while the pointer is away");
-    app.rt.pointer_move(200.0, 300.0);
-    app.wait(STEP);
-    assert!(ink(&app) >= READABLE);
-    assert_eq!(app.read("top-text").as_deref(), Some("+ name this block"));
+    assert_eq!(app.read("top-text").as_deref(), Some("+ name this block"), "in sight with the block, pointer or not");
+    app.space();
+    app.look();
+    assert!(ink(&app) < 0.01, "and gone once the block runs unnamed");
 }
 
 #[test]
@@ -438,4 +503,195 @@ fn an_idle_window_wakes_at_four_in_the_morning_and_turns_the_day() {
     assert!(s.study.roll_over(s.cal, s.unix(), &s.timer).is_some(), "and a new cycle begins");
     let (water, stars) = s.lanterns();
     assert_eq!((stars.len(), water.len()), (0, 0), "yesterday's lantern has left today's sky");
+}
+
+#[test]
+fn a_block_let_go_can_be_taken_back_until_the_next_start_even_from_today() {
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    app.wait(20.0);
+    app.char("s");
+    // One ten-minute step with no frames in it: only the wakes the window asked for run.
+    app.rt.frame(600.0);
+    app.settle();
+    assert_eq!(app.phase(), "rest · space when you're ready", "the quiet ring ended on its own wake");
+    assert!(app.has("undo"), "ten minutes on, the offer stands");
+    app.char("h");
+    app.look();
+    app.char("u");
+    app.key(Key::Escape);
+    app.look();
+    assert_eq!(app.lanterns(), 1, "it ran on all along, so it is over, and lit");
+    let mut started = App::new();
+    started.one_minute();
+    started.space();
+    started.wait(20.0);
+    started.char("s");
+    started.wait(RING + 0.5);
+    started.space();
+    started.char("u");
+    assert!(!started.has("undo") && started.phase() == "rest", "once the break starts, it can't be");
+}
+
+#[test]
+fn a_still_window_wakes_for_the_bell_it_owes() {
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    // An hour in one step: if the bell's wake were missing, the block would end at the hour.
+    app.rt.frame(3600.0);
+    app.settle();
+    app.char("h");
+    app.look();
+    let lantern = app.node("day-lantern-0").expect("the block is in Today");
+    assert!(lantern["name"].as_str().unwrap().starts_with("14:00 – 14:01 · 1 min"), "{lantern}");
+}
+
+#[test]
+fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
+    let mut app = App::new();
+    let control = |app: &App, key: &str| {
+        let n = app.node(key).unwrap_or_else(|| panic!("{key} is in the accessibility tree"));
+        assert_eq!(n["role"], "button", "{n}");
+        assert!(n["actions"].as_array().is_some_and(|a| a.contains(&"click".into())), "{key} can be pressed: {n}");
+        n["name"].as_str().unwrap_or_default().to_string()
+    };
+    let names: Vec<String> =
+        ["control-play", "control-today", "control-place", "control-keys"].iter().map(|k| control(&app, k)).collect();
+    assert_eq!(names, ["Start focus", "Today", "Place: Coast", "Keys"]);
+    app.voiceover_press("control-play");
+    app.wait(2.0);
+    assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()), "pressed as a click would");
+    assert_eq!(
+        (control(&app, "control-play"), control(&app, "control-skip")),
+        ("Pause".into(), "Let go of this block".into())
+    );
+    app.voiceover_press("control-play");
+    app.wait(1.0);
+    assert_eq!(app.phase(), "the sky waits · space to resume");
+    assert_eq!(control(&app, "control-play"), "Resume");
+}
+
+#[test]
+fn each_bell_is_announced_once_politely_whatever_page_is_open() {
+    let done = "Focus complete. 5-minute break ready.".to_string();
+    let mut app = App::new();
+    app.one_minute();
+    app.space();
+    app.wait(30.0);
+    assert_eq!(app.status(), None, "a running block's seconds are never announced");
+    app.char("h");
+    app.look();
+    app.rt.frame(31.0);
+    assert_eq!(app.status(), Some((done.clone(), true)), "the bell is news while Today is open");
+    app.settle();
+    assert_eq!(app.status(), Some((done.clone(), false)), "and said once");
+    assert_eq!(app.read("status"), Some(done.clone()), "Today shows it too");
+    app.char("?");
+    app.look();
+    assert_eq!(app.status(), Some((done.clone(), false)), "the key card shows it without saying it again");
+    app.key(Key::Escape);
+    app.key(Key::Escape);
+    app.look();
+    assert_eq!(app.status(), Some((done, false)), "back on the scene it is still quiet");
+    app.wait(RING);
+    app.space();
+    assert_eq!(app.status(), None, "the break has started");
+    app.rt.frame(5.0 * 60.0);
+    assert_eq!(app.status(), Some(("Break complete. Focus ready.".into(), true)));
+}
+
+/// Whether `rect` is wholly inside `within`.
+fn inside(rect: [f32; 4], within: [f32; 4]) -> bool {
+    let [x, y, w, h] = rect;
+    let [a, b, c, d] = within;
+    x >= a - 0.5 && y >= b - 0.5 && x + w <= a + c + 0.5 && y + h <= b + d + 0.5
+}
+
+#[test]
+fn a_long_day_keeps_every_lantern_apart_and_reachable_from_the_keyboard() {
+    let mut app = App::scene("busy");
+    app.key(Key::Escape);
+    app.char("h");
+    app.look();
+    let targets: Vec<[f32; 4]> = app
+        .rt
+        .elements()
+        .into_iter()
+        .filter(|e| e.key.as_deref().is_some_and(|k| k.starts_with("day-lantern-") || k.starts_with("day-ring-")))
+        .filter(|e| !e.key.as_deref().is_some_and(|k| k.contains("art")))
+        .map(|e| e.rect)
+        .collect();
+    assert_eq!(targets.len(), 19);
+    for (i, a) in targets.iter().enumerate() {
+        for b in &targets[i + 1..] {
+            assert!(a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0], "targets overlap: {a:?} {b:?}");
+        }
+    }
+    let view = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(today::STRIP)).unwrap().rect;
+    let newest = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("day-lantern-14")).unwrap().rect;
+    assert!(inside(newest, view), "Today opens on the newest: {newest:?} in {view:?}");
+    for key in ["day-lantern-0", "day-ring-3", "day-lantern-14"] {
+        let at = app.tab_to(|k| k == key);
+        assert!(inside(at, view), "{key} scrolls into view: {at:?} in {view:?}");
+    }
+}
+
+#[test]
+fn four_long_names_push_history_down_and_the_page_scrolls_to_it() {
+    let mut app = App::scene("today");
+    let names =
+        ["Draft literature review", "Calculus practice problems", "Read research paper", "Write seminar summary"];
+    for (i, name) in names.iter().enumerate() {
+        app.tap(&format!("day-lantern-{i}"));
+        app.tap("detail-rename");
+        app.key(Key::Command('a'));
+        app.typed(name);
+        app.key(Key::Enter);
+        app.look();
+    }
+    let window = [0.0, 0.0, W, H];
+    for key in ["timer-bar", "today-title", "today-close"] {
+        let at = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some(key)).unwrap().rect;
+        assert!(inside(at, window), "{key} stays put: {at:?}");
+    }
+    app.tab_to(|k| k.strip_prefix("day-").is_some_and(|n| n.parse::<i64>().is_ok()));
+    app.key(Key::End);
+    app.look();
+    let today = format!("day-{}", UTC.day_of(HEADLESS_EPOCH as i64).0);
+    let (key, at) = app.focused().unwrap();
+    assert_eq!(key, today, "End reaches the last day in the grid");
+    assert!(inside(at, window), "and today's tile scrolls into view: {at:?}");
+    app.rt.wheel(190.0, 400.0, -2000.0);
+    app.look();
+    let legend = app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("history-scale")).unwrap().rect;
+    assert!(inside(legend, window), "and the wheel reaches the legend: {legend:?}");
+}
+
+#[test]
+fn today_keeps_the_running_block_in_sight_and_in_hand() {
+    let mut app = App::new();
+    app.space();
+    app.wait(4.0);
+    app.char("h");
+    app.look();
+    let bar = |app: &App| app.read("timer-text").unwrap_or_default();
+    assert_eq!(bar(&app), "Focus · 24:56 left", "the block runs on in sight");
+    app.tap("timer-press");
+    app.look();
+    assert!(bar(&app).starts_with("Paused · 24:5"), "paused from Today: {}", bar(&app));
+    app.wait(10.0);
+    app.space();
+    app.look();
+    assert!(bar(&app).starts_with("Focus · 24:5"), "and Space there resumes it where you can see: {}", bar(&app));
+    app.char("s");
+    app.wait(RING + 0.5);
+    assert_eq!(bar(&app), "Break ready · 05:00");
+    app.tap("timer-undo");
+    app.look();
+    assert!(bar(&app).starts_with("Focus · 24:"), "a let go comes back from Today: {}", bar(&app));
+    app.tap("today-close");
+    app.look();
+    assert_eq!(app.phase(), "focus", "and Back to sunset finds it still running");
 }

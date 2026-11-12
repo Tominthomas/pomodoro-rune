@@ -11,8 +11,6 @@ pub const MAX_SECS: u32 = 60 * 60;
 pub const MIN_SECS: u32 = 60;
 /// How long the bell rings before the next phase winds up.
 pub const RING: f64 = 3.6;
-/// How long a block let go can still be taken back.
-pub const UNDO: f64 = 9.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -117,7 +115,7 @@ pub enum Event {
     Skip { now: f64 },
     /// The clock reached the deadline `Timer::due` asked for.
     Due { now: f64 },
-    /// Takes back the last let go, while `Timer::can_undo` says it still can.
+    /// Takes back the last let go, until the next phase starts.
     Undo { now: f64 },
 }
 
@@ -164,14 +162,8 @@ pub struct Timer {
     pub done: u8,
     pub lengths: Lengths,
     pub clock: Clock,
-    /// The block let go last, as it was, until it can no longer be taken back.
-    undo: Option<Undo>,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-struct Undo {
-    clock: Clock,
-    until: f64,
+    /// The block let go last, as it was, until the next phase starts.
+    undo: Option<Clock>,
 }
 
 impl Default for Timer {
@@ -186,9 +178,10 @@ impl Timer {
         Timer { phase, done: done.min(CYCLE), lengths, clock: Clock::Wound, undo: None }
     }
 
-    /// Whether the block let go last can still be taken back.
-    pub fn can_undo(&self, now: f64) -> bool {
-        self.undo.as_ref().is_some_and(|u| now < u.until)
+    /// Whether the block let go last can still be taken back: until the next phase starts, so
+    /// the offer lasts as long as it takes to notice, through the break and Today too.
+    pub fn can_undo(&self) -> bool {
+        self.undo.is_some()
     }
 
     /// The length the current phase is set to, live while a hand is setting it.
@@ -228,23 +221,15 @@ impl Timer {
         match &self.clock {
             Clock::Ticking { tick, .. } => Some(*tick),
             Clock::Ringing { until, .. } => Some(*until),
-            _ => self.undo.as_ref().map(|u| u.until),
+            _ => None,
         }
     }
 
     pub fn step(&mut self, event: Event) -> Effects<Effect> {
         let mut fx = Effects::none();
-        match event {
-            Event::Undo { now } => {
-                self.undo(now, &mut fx);
-                return fx;
-            }
-            Event::Due { now } => {
-                if self.undo.as_ref().is_some_and(|u| now >= u.until) {
-                    self.undo = None;
-                }
-            }
-            _ => self.undo = None,
+        if let Event::Undo { now } = event {
+            self.undo(now, &mut fx);
+            return fx;
         }
         match (self.clock.clone(), event) {
             (Clock::Ringing { kept, .. }, Event::Press { .. }) => self.advance_by(kept, &mut fx),
@@ -300,6 +285,7 @@ impl Timer {
     }
 
     fn start(&mut self, secs: u32, now: f64, fx: &mut Effects<Effect>) {
+        self.undo = None;
         self.tick(now + f64::from(secs), now, Run { planned: secs, pauses: Vec::new(), paused: 0.0 }, fx);
     }
 
@@ -333,20 +319,21 @@ impl Timer {
         fx.push(Effect::Ended(Ended::of(Outcome::LetGo, focused, run)));
         let until = now + RING;
         self.clock = Clock::Ringing { until, kept: false, from };
-        self.undo = Some(Undo { clock: before, until: now + UNDO });
+        self.undo = Some(before);
         fx.push(Effect::WakeAt(until));
     }
 
     /// Puts the block let go last back as it was. A running block kept running all along, so
-    /// the seconds since count; one that was paused is still paused.
+    /// the seconds since count, and one taken back after its end rings at once; one that was
+    /// paused is still paused.
     fn undo(&mut self, now: f64, fx: &mut Effects<Effect>) {
-        let Some(undo) = self.undo.take().filter(|u| now < u.until) else { return };
+        let Some(clock) = self.undo.take() else { return };
         if self.phase != Phase::Focus {
             fx.push(Effect::Advanced { from: self.phase, to: Phase::Focus });
         }
         self.phase = Phase::Focus;
         fx.push(Effect::Unended);
-        match undo.clock {
+        match clock {
             Clock::Ticking { ends_at, run, .. } => self.tick(ends_at, now, run, fx),
             clock => self.clock = clock,
         }
@@ -508,14 +495,16 @@ mod tests {
     }
 
     #[test]
-    fn a_block_let_go_can_be_taken_back_for_a_few_seconds() {
+    fn a_block_let_go_can_be_taken_back_through_the_break_until_it_starts() {
         let mut t = Timer::default();
         let mut now = 0.0;
         t.step(Event::Press { now });
         t.step(Event::Skip { now: 600.0 });
         t.step(Event::Due { now: 600.0 + RING });
+        t.step(Event::Nudge { minutes: 2 });
         assert_eq!(t.phase, Phase::Short, "the break waits after the quiet ring");
-        now = 603.0;
+        now = 900.0;
+        assert!(t.can_undo(), "minutes later, and after setting the break's length");
         let fx: Vec<_> = t.step(Event::Undo { now }).into_iter().collect();
         assert!(fx.contains(&Effect::Unended), "{fx:?}");
         assert_eq!(t.phase, Phase::Focus);
@@ -526,16 +515,15 @@ mod tests {
     }
 
     #[test]
-    fn a_let_go_cant_be_taken_back_once_its_moment_has_passed() {
+    fn a_let_go_cant_be_taken_back_once_the_break_starts() {
         let mut t = Timer::default();
         t.step(Event::Press { now: 0.0 });
-        t.step(Event::Press { now: 100.0 });
         t.step(Event::Skip { now: 200.0 });
-        assert!(t.can_undo(200.0 + UNDO - 0.1));
         let mut now = 200.0;
         run_to_end(&mut t, &mut now);
-        assert_eq!(now, 200.0 + UNDO, "the timer wakes once more to take the offer away");
-        assert!(!t.can_undo(now));
+        assert_eq!(now, 200.0 + RING, "nothing is due once the quiet ring is over");
+        t.step(Event::Press { now });
+        assert!(!t.can_undo());
         let before = t.clone();
         assert!(t.step(Event::Undo { now }).into_iter().next().is_none());
         assert_eq!(t, before);

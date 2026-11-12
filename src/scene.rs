@@ -319,10 +319,11 @@ pub fn view(s: &Scene<'_>) -> El {
         if c[1] < HZ - 2.0 { sky_lanterns.push(lantern) } else { lanterns.push(lantern) }
     }
 
+    // The painting is decoration to assistive technology; only the lanterns say anything.
     let stage = sky
-        .child(glow)
-        .child(canvas(soft).absolute(0.0, 0.0).size(W, H).blur(7.0).cache())
-        .child(canvas(a).absolute(0.0, 0.0).size(W, H))
+        .child(glow.a11y_hidden())
+        .child(canvas(soft).absolute(0.0, 0.0).size(W, H).blur(7.0).cache().a11y_hidden())
+        .child(canvas(a).absolute(0.0, 0.0).size(W, H).a11y_hidden())
         // The sun's box, for tools that check where it stands; it draws nothing.
         .child(
             el().key("sun")
@@ -331,27 +332,28 @@ pub fn view(s: &Scene<'_>) -> El {
                 .opacity(sun_vis)
                 .a11y_hidden(),
         )
-        .child(clouds(&p, sun_p, dusk, t))
-        .child(canvas(land).absolute(0.0, 0.0).size(W, H));
+        .child(clouds(&p, sun_p, dusk, t).a11y_hidden())
+        .child(canvas(land).absolute(0.0, 0.0).size(W, H).a11y_hidden());
     // Every layer is drawn in every phase, empty when it has nothing to show, so the scene keeps
     // one shape and nothing is matched against a different layer as a phase ends.
-    let mut stage = stage.child(afterglow(s.place, blue.unwrap_or(0.0), s.sky.afterglow()));
+    let mut stage = stage.child(afterglow(s.place, blue.unwrap_or(0.0), s.sky.afterglow()).a11y_hidden());
     stage = sky_lanterns.into_iter().chain(aloft_lanterns).fold(stage, El::child);
-    stage = stage.child(water(s, &p, sun, sun_p, sun_vis, glow_k, moon.map(|_| moon_k).filter(|k| *k > 0.0)));
-    stage = stage.child(canvas(ripple(s.sky, sun[0])).key("ripple").absolute(0.0, 0.0).size(W, H).blur(0.8));
-    stage = stage.child(el().key("grain").absolute(0.0, 0.0).size(W, H).pixels(grain()));
     stage =
-        stage.child(
-            el().key("dusk-veil")
-                .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
-                .fill(rgb(0x04061a).alpha(if s.dark { 0.22 } else { 0.0 })),
-        );
+        stage.child(water(s, &p, sun, sun_p, sun_vis, glow_k, moon.map(|_| moon_k).filter(|k| *k > 0.0)).a11y_hidden());
+    stage =
+        stage.child(canvas(ripple(s.sky, sun[0])).key("ripple").absolute(0.0, 0.0).size(W, H).blur(0.8).a11y_hidden());
+    stage = stage.child(el().key("grain").absolute(0.0, 0.0).size(W, H).pixels(grain()).a11y_hidden());
     stage = stage.child(
-        el().key("veil").pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).fill(rgb(0x2a3058).alpha(if s.held {
-            0.14
-        } else {
-            0.0
-        })),
+        el().key("dusk-veil")
+            .a11y_hidden()
+            .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
+            .fill(rgb(0x04061a).alpha(if s.dark { 0.22 } else { 0.0 })),
+    );
+    stage = stage.child(
+        el().key("veil")
+            .a11y_hidden()
+            .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
+            .fill(rgb(0x2a3058).alpha(if s.held { 0.2 } else { 0.0 })),
     );
     lanterns.into_iter().fold(stage, El::child)
 }

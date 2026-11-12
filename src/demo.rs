@@ -45,6 +45,17 @@ fn morning(s: &mut State) {
     s.label.replace_text("Problem set");
 }
 
+/// A long day: nineteen blocks from half past four, about every half hour, every fifth let go.
+fn busy(s: &mut State) {
+    let blocks: Vec<Seeded<'_>> = (0..19)
+        .map(|i| {
+            let outcome = if i % 5 == 3 { Outcome::LetGo } else { Outcome::Finished };
+            (4.6 + i as f32 * 0.49, outcome, &[][..], None, ["Lecture notes", "Problem set", "Reading"][i % 3])
+        })
+        .collect();
+    seed(s, 0, &blocks);
+}
+
 /// Four weeks of history behind today, deterministic, with rest days among them.
 fn month(s: &mut State) {
     for back in 1..24i64 {
@@ -172,6 +183,11 @@ pub const SCENES: &[(&str, Setup)] = &[
     }),
     ("today", |s| {
         morning(s);
+        month(s);
+        s.page = Page::Today(crate::today::Nav::default());
+    }),
+    ("busy", |s| {
+        busy(s);
         month(s);
         s.page = Page::Today(crate::today::Nav::default());
     }),
