@@ -231,7 +231,7 @@ CHECKS = [
         "cycle",
         "b1-bell",
         lambda t: (
-            phase(t) == "a lantern for that one"
+            phase(t) == "1 of 4 lanterns · 5-minute break ready"
             and (text(t, "time"), text(t, "time-unit")) == ("1 min", "focused")
             and (t["@a11y"]["time"].get("name"), spoken(t, "time")) == ("Block complete", "1 minute focused")
             and lanterns(t) == ["lantern-0"]
@@ -241,7 +241,9 @@ CHECKS = [
         "then a short break waits, offering three words",
         "cycle",
         "b1-break",
-        lambda t: phase(t) == "rest · space when you're ready" and lanterns(t) == ["lantern-0"] and "felt-deep" in t,
+        lambda t: (
+            phase(t) == "1 of 4 lanterns · 5-minute break ready" and lanterns(t) == ["lantern-0"] and "felt-deep" in t
+        ),
     ),
     (
         "the label carries over to the next block",
@@ -254,7 +256,9 @@ CHECKS = [
         "and still lights a lantern, with a knot for the pause",
         "cycle",
         "b2-break",
-        lambda t: label(t, "lantern-1") == "Lantern 2, paused once",
+        lambda t: (
+            label(t, "lantern-1") == "Lantern 2, paused once" and phase(t) == "2 of 4 lanterns · 5-minute break ready"
+        ),
     ),
     (
         "a skipped block rings out with no lantern, and says its minutes still count",
@@ -272,7 +276,7 @@ CHECKS = [
         "four lanterns earn the long break",
         "cycle",
         "long",
-        lambda t: phase(t) == "long rest · space when you're ready" and len(lanterns(t)) == 4,
+        lambda t: phase(t) == "4 of 4 lanterns · 15-minute long break ready" and len(lanterns(t)) == 4,
     ),
     ("the long break can be set to a minute too", "cycle", "long-set", lambda t: text(t, "time") == "01:00"),
     (
@@ -390,7 +394,9 @@ CHECKS = [
         "the click that brings the window forward starts nothing",
         "activate",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
+        lambda t: (
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus. A finished block lights a lantern."
+        ),
     ),
     (
         "the next click starts the sunset",
@@ -402,7 +408,9 @@ CHECKS = [
         "the activating click on a control does nothing either",
         "activate-control",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
+        lambda t: (
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus. A finished block lights a lantern."
+        ),
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
     (
@@ -506,6 +514,12 @@ CHECKS = [
     ),
     ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
+    (
+        "and says what the lanterns earn and that the timer is silent",
+        "keys",
+        "open",
+        lambda t: "four earn a long break" in text(t, "keys-about") and "no sound" in text(t, "keys-about"),
+    ),
     ("half a minute out, the sun's lower limb is still above the sea", "bell", "half", lambda t: sun_bottom(t) < 329.0),
     ("at 00:00 it touches the water", "bell", "zero", lambda t: abs(sun_bottom(t) - 330.0) < 0.6),
     (

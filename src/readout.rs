@@ -8,7 +8,7 @@ use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, col, el, row, text, te
 
 use crate::log::{self, Felt};
 use crate::theme::{H, Ink, W};
-use crate::timer::{Clock, Event, Phase, Timer};
+use crate::timer::{CYCLE, Clock, Event, Phase, Timer};
 use crate::{Asking, State, carry, edit_label, finish_label, guarded, rate};
 
 /// Text on the scene: the main line, and the quieter ones under it. Both keep 4.5:1 on the
@@ -102,19 +102,26 @@ pub fn phase_line(s: &State) -> String {
         return skipped_line(s.study.log.blocks.last().map_or(0, |b| b.focused));
     }
     match (t.phase, &t.clock) {
-        (Phase::Focus, Clock::Ringing { .. }) => "a lantern for that one",
-        (_, Clock::Paused { .. }) => "the sky waits · space to resume",
-        (_, Clock::Scrubbing { .. }) => "release to set the length",
-        (Phase::Focus, Clock::Wound) if s.teaching() => "focus · click the sky or press space to begin",
-        (Phase::Focus, Clock::Wound) => "focus · space to begin",
-        (Phase::Focus, _) => "focus",
-        (_, Clock::Ringing { .. }) => "the break is over",
-        (Phase::Short, Clock::Wound) => "rest · space when you're ready",
-        (Phase::Short, _) => "rest",
-        (Phase::Long, Clock::Wound) => "long rest · space when you're ready",
-        (Phase::Long, _) => "long rest, four lanterns up",
+        (Phase::Focus, Clock::Ringing { .. }) | (Phase::Short | Phase::Long, Clock::Wound) => cycle_line(t),
+        (_, Clock::Paused { .. }) => "the sky waits · space to resume".into(),
+        (_, Clock::Scrubbing { .. }) => "release to set the length".into(),
+        (Phase::Focus, Clock::Wound) if s.teaching() => {
+            "The sun sets as you focus. A finished block lights a lantern.".into()
+        }
+        (Phase::Focus, Clock::Wound) => "focus · space to begin".into(),
+        (Phase::Focus, _) => "focus".into(),
+        (_, Clock::Ringing { .. }) => "the break is over".into(),
+        (Phase::Short, _) => "rest".into(),
+        (Phase::Long, _) => "long rest, four lanterns up".into(),
     }
-    .into()
+}
+
+/// Where the cycle stands once a block is done, and the break it earned: "1 of 4 lanterns ·
+/// 5-minute break ready". Four make the long break, so the count says how far off it is.
+fn cycle_line(t: &Timer) -> String {
+    let (next, done) = t.settled();
+    let kind = if next == Phase::Long { "long break" } else { "break" };
+    format!("{done} of {CYCLE} lanterns · {}-minute {kind} ready", t.lengths.of(next) / 60)
 }
 
 /// What a skip did with the block's `focused` seconds: they count, and light nothing.
@@ -129,9 +136,8 @@ fn skipped_line(focused: u32) -> String {
 /// What a bell says once it has rung: the phase it ended, and what waits now.
 pub fn rang(ended: Phase, t: &Timer) -> String {
     match (ended, t.settled().0) {
-        (Phase::Focus, next @ (Phase::Short | Phase::Long)) => {
-            let kind = if next == Phase::Long { "long break" } else { "break" };
-            format!("Focus complete. {}-minute {kind} ready.", t.lengths.of(next) / 60)
+        (Phase::Focus, Phase::Short | Phase::Long) => {
+            format!("Focus complete. {}.", cycle_line(t).replace(" · ", ". "))
         }
         _ => "Break complete. Focus ready.".into(),
     }
@@ -182,7 +188,7 @@ pub fn view(s: &State, k: Ink) -> El {
                 .key("hint")
                 .gap(8.0)
                 .center_y()
-                .child(line(k, "or drag the sun first to change the length", 11.0, 480.0, BRIGHT))
+                .child(line(k, "Drag the sun to set the length", 11.0, 480.0, BRIGHT))
                 .child(
                     button(k, "hint-dismiss", "got it", "Hide this hint")
                         .on_press_tx(guarded(|s, _| s.put_hint_away())),

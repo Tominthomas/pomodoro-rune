@@ -235,7 +235,10 @@ impl App {
 #[test]
 fn space_starts_pauses_and_resumes_the_sunset() {
     let mut app = App::new();
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+    );
     app.space();
     app.wait(2.0);
     assert_eq!((app.time(), app.phase()), ("24:58".into(), "focus".into()));
@@ -307,14 +310,18 @@ fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
     app.one_minute();
     assert_eq!(app.time(), "01:00");
     app.run_to_bell();
-    assert_eq!((app.time(), app.phase()), ("1 min".into(), "a lantern for that one".into()));
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("1 min".into(), "1 of 4 lanterns · 5-minute break ready".into()),
+        "the cycle, at the bell"
+    );
     assert_eq!(app.read("time-unit").as_deref(), Some("focused"), "what the minute was, not what is left");
     let time = app.node("time").unwrap();
     assert_eq!((&time["name"], &time["value"]), (&"Block complete".into(), &"1 minute focused".into()));
     assert_eq!(app.lanterns(), 1);
     assert_eq!(app.read("reflect-question").as_deref(), Some("How did that block feel? Optional."));
     app.wait(RING + 0.5);
-    assert_eq!((app.time(), app.phase()), ("05:00".into(), "rest · space when you're ready".into()));
+    assert_eq!((app.time(), app.phase()), ("05:00".into(), "1 of 4 lanterns · 5-minute break ready".into()));
     app.char("2");
     assert_eq!(app.read("reflect-question").as_deref(), Some("Felt steady. Noted."));
     app.wait(ACKNOWLEDGED + 0.5);
@@ -334,9 +341,9 @@ fn s_skips_a_block_and_u_takes_it_back_so_it_counts_once_finished() {
     app.char("u");
     assert_eq!((app.time(), app.phase()), ("00:39".into(), "focus".into()), "running all along");
     app.wait(40.0);
-    assert_eq!((app.phase(), app.lanterns()), ("a lantern for that one".into(), 1));
+    assert_eq!((app.phase(), app.lanterns()), ("1 of 4 lanterns · 5-minute break ready".into(), 1));
     let mut back = app.relaunch(3600.0);
-    assert_eq!((back.phase(), back.lanterns()), ("rest · space when you're ready".into(), 1));
+    assert_eq!((back.phase(), back.lanterns()), ("1 of 4 lanterns · 5-minute break ready".into(), 1));
     back.char("h");
     back.look();
     assert_eq!((back.read("stat-lanterns-value").as_deref(), back.has("stat-skipped")), (Some("1"), false));
@@ -379,7 +386,10 @@ fn l_from_today_names_the_next_block_and_its_letters_never_reach_the_timer() {
     app.key(Key::Enter);
     app.look();
     assert_eq!(app.read("top-text").as_deref(), Some("Study the last unit, slowly"));
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+    );
     assert_eq!(app.rt.state.place, 0, "still at the coast");
     app.space();
     app.char("h");
@@ -504,7 +514,10 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("sky");
     app.wait(1.0);
-    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
+    assert_eq!(
+        (app.time(), app.phase()),
+        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+    );
     app.tap("sky");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus", "the next click does");
@@ -523,7 +536,7 @@ fn the_activating_click_on_a_control_does_nothing_either() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "focus · click the sky or press space to begin");
+    assert_eq!(app.phase(), "The sun sets as you focus. A finished block lights a lantern.");
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");
@@ -557,10 +570,10 @@ fn four_lanterns_earn_the_long_break_and_quitting_during_its_bell_keeps_it() {
     app.run_to_bell();
     assert_eq!(app.lanterns(), 4);
     let back = app.relaunch(4.0 * 3600.0);
-    assert_eq!((back.phase(), back.time()), ("long rest · space when you're ready".into(), "15:00".into()));
+    assert_eq!((back.phase(), back.time()), ("4 of 4 lanterns · 15-minute long break ready".into(), "15:00".into()));
     assert_eq!(back.lanterns(), 4, "the four are on the water, waiting to rise");
     app.wait(RING + 0.5);
-    assert_eq!(app.phase(), "long rest · space when you're ready");
+    assert_eq!(app.phase(), "4 of 4 lanterns · 15-minute long break ready");
     app.space();
     app.wait(1.0);
     assert_eq!((app.phase(), app.lanterns()), ("long rest, four lanterns up".into(), 4));
@@ -703,7 +716,7 @@ fn voiceover_finds_every_control_and_presses_play_while_the_dock_is_hidden() {
 
 #[test]
 fn each_bell_is_announced_once_politely_whatever_page_is_open() {
-    let done = "Focus complete. 5-minute break ready.".to_string();
+    let done = "Focus complete. 1 of 4 lanterns. 5-minute break ready.".to_string();
     let mut app = App::new();
     app.one_minute();
     app.space();

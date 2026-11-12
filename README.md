@@ -41,7 +41,7 @@ cargo run --release
 
 A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The sun sinks as the minutes run out.
 
-When the sun reaches the sea, ripples spread across the water and a lantern lights. The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
+When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
 
 A five-minute break waits next. Press Space or click the sky to start it. After the fourth lantern, the break is fifteen minutes, and the lanterns rise into the night. When the break ends, dawn opens the next block, which waits for you to start it.
 

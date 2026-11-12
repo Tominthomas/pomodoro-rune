@@ -15,7 +15,7 @@ This directory is the maintained source for verifying what a user sees in Pomodo
 - Every recipe drives a committed script in `scripts/` at a mark it names, or a throwaway script the file gives in full. Save a throwaway script as `$RUN/<name>.json`, never in `scripts/`.
 - Act through keys, keyed taps (`{"type":"tap","key":"control-play"}`), sky taps at `190,200` and drags on the sun. Never set state another way.
 - Read text through `look`. Text drawn with `ink` under 0.5 counts as not shown.
-- Expected strings are copied from the app. Compare them exactly, including `·` and the straight apostrophe in `space when you're ready`.
+- Expected strings are copied from the app. Compare them exactly, including `·` and the straight apostrophe in `you're`.
 
 ## Proof and skip reporting
 

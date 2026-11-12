@@ -21,7 +21,7 @@ Preconditions:
 
 - The baseline from `README.md`. `cycle.json` runs five one-minute blocks, with the third skipped, then sets the long break to one minute. `night.json` starts from the `night-minute` scene, which has four lanterns and a one-minute long break waiting.
 
-- **Earned.** Run `look scripts/cycle.json --at mark:long --fps 10 phase 'lantern-*' --out $RUN/long`. `phase` reads `long rest · space when you're ready` and four lanterns exist, `lantern-0` to `lantern-3`.
+- **Earned.** Run `look scripts/cycle.json --at mark:long --fps 10 phase 'lantern-*' --out $RUN/long`. `phase` reads `4 of 4 lanterns · 15-minute long break ready` and four lanterns exist, `lantern-0` to `lantern-3`.
 - **Night falls.** Press Space. Run `look scripts/cycle.json --at mark:night-early --fps 10 phase 'lantern-*' --out $RUN/night`. `phase` reads `long rest, four lanterns up` and every lantern's centre (`rect` y plus half its height) is below 330, still on the water.
 - **Lanterns rise.** Run `look scripts/cycle.json --at mark:rising --fps 10 'lantern-*' --out $RUN/rising`. Every lantern's centre is above 330.
 - **Sky only darkens.** Run `python3 tools/check.py bell-light`. It passes for light and dark.

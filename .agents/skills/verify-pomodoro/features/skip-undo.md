@@ -38,7 +38,7 @@ Preconditions:
 
 ## Gotchas
 
-- The phase line explains the skip for as long as Undo is offered, so a break waiting after a skip says `Skipped. …`, not `rest · space when you're ready`. A mark after Space starts the break sees the usual break line and no `undo`.
+- The phase line explains the skip for as long as Undo is offered, so a break waiting after a skip says `Skipped. …`, not `1 of 4 lanterns · 5-minute break ready`. A mark after Space starts the break sees the usual break line and no `undo`.
 - Records saved before the rename say `let_go`. They load as skipped blocks (`#[serde(alias)]` on `Outcome::Skipped`).
 - `control-skip` is always in the accessibility tree while it applies, but its look is hidden until the controls show. Move the pointer over the window or press Tab first, or the tap lands on `dock-cover` and does nothing.
 - During the bell's ring after a finished block, and while a focus block waits, there is no `control-skip` at all.

@@ -8,12 +8,12 @@ While a block or a break waits, the user sets its length in one-minute steps by 
 - `length-steppers` makes it a minute shorter or longer with the `shorter` and `longer` buttons, which sit beside the time while the clock waits. They are always in the accessibility tree and drawn once the pointer moves or Tab is pressed.
 - `length-drag` raises or lowers the sun to set the length. The phase line reads `release to set the length` while dragging.
 - `length-release` sets the length on release and starts nothing.
-- `length-hint` shows `or drag the sun first to change the length` with a `got it` button on a first launch, under the phase line `focus · click the sky or press space to begin`.
+- `length-hint` shows `Drag the sun to set the length` with a `got it` button on a first launch, under the phase line `The sun sets as you focus. A finished block lights a lantern.`.
 - `length-break` sets a waiting break's length with the arrows or a drag.
 
 ## How to get to it (user POV)
 
-- Press the arrow keys while the phase line ends in `space to begin` or `space when you're ready`.
+- Press the arrow keys while the phase line ends in `space to begin` or `break ready`.
 - Move the pointer, then click − or + beside the time.
 - Press on the sun and drag up or down, then release.
 - Click `got it` (key `hint-dismiss`) to put the hint away.
@@ -35,7 +35,7 @@ Preconditions:
   ```
 
 - **Break length.** Press Down 14 times while the long break waits. Run `look scripts/cycle.json --at mark:long-set --fps 10 time`. `time` reads `01:00`.
-- **Break by drag.** Save this as `$RUN/drag-break.json`, then run `look $RUN/drag-break.json --scene bell --at mark:break phase time` and the same at `mark:dragged`. `phase` reads `rest · space when you're ready` both times, and `time` goes from `05:00` to `01:00`.
+- **Break by drag.** Save this as `$RUN/drag-break.json`, then run `look $RUN/drag-break.json --scene bell --at mark:break phase time` and the same at `mark:dragged`. `phase` ends in `5-minute break ready`, then in `1-minute break ready`, and `time` goes from `05:00` to `01:00`.
 
   ```json
   {"events":[{"t":8.0,"type":"mark","name":"break"},{"t":9.5,"type":"down","x":186,"y":140},{"t":9.6,"type":"move","x":186,"y":170},{"t":9.7,"type":"move","x":186,"y":250},{"t":9.9,"type":"up","x":186,"y":250},{"t":11.0,"type":"mark","name":"dragged"}]}

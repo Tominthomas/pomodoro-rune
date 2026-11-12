@@ -202,6 +202,9 @@ fn pick_place(s: &mut State, tx: &mut Tx) {
     });
 }
 
+/// What the keys serve, said once above them: the cycle, and that the timer makes no sound.
+const ABOUT: &str = "A finished block lights a lantern, and four earn a long break. The timer makes no sound, so keep the sunset in sight.";
+
 /// Every key, grouped by what it is for: the timer, the block, and finding your way around.
 const KEYS: [(&str, &[(&str, &str)]); 3] = [
     (
@@ -275,6 +278,13 @@ pub fn keys(status: Option<El>) -> El {
         .child(row().justify_between().center_y().child(line(Ink::light(), "Keys", 15.0, 520.0, BRIGHT)).child(
             button(Ink::light(), "keys-close", "Close", "Close  Esc").on_press_tx(guarded(|s, _| s.keys_open = false)),
         ))
+        .child(
+            text(ABOUT)
+                .key("keys-about")
+                .font(TextStyle::new(SMALL, 450.0))
+                .color(Ink::light().text.alpha(BRIGHT))
+                .wrap(),
+        )
         .child(groups);
     let card = match status {
         Some(words) => card.child(words),
