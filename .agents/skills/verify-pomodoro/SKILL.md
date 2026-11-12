@@ -33,9 +33,9 @@ Pick the feature file in [`features/`](features/README.md). It names the scene, 
 
 - **A script** is timestamped input in JSON. The 21 committed ones in `scripts/` come from `tools/scripts.py`. Edit that file and run `python3 tools/scripts.py` to add or change a committed one, because CI fails when they differ. A throwaway journey goes in the evidence directory as its own JSON file, never in `scripts/`. Events are `{"t":1.0,"type":"key","name":"s"}` (names include `" "`, `Up`, `Down`, `Enter`, `Escape`, `Tab`, and `"cmd":true` for ⌘), `{"type":"type","text":"Essay"}`, `{"type":"tap","key":"control-play"}` or `"x","y"` in points, `move`, `down`, `up`, `{"type":"wheel","x":190,"y":400,"dy":-2000}`, `{"focus":false}`, `{"type":"menu-pick","id":"Mesa"}` for a popup menu, `{"menu":"timer-press"}` for a menu-bar item, and `{"type":"mark","name":"skipped"}`.
 - **A scene** (`--scene NAME`) starts from a seeded moment instead of a first launch: `focus-early focus-late paused bell skipped short long evening last-minute night-minute today busy controls`. `today` has five blocks this morning and four weeks of history. A first launch has an empty log, 25-minute blocks and the length hint showing.
-- **Read the screen** at a mark with `$SKILL/scripts/look.py` (see Helpers). Assert on `text` and `label`, and treat text with `ink` under 0.5 as unreadable. That is the floor `tools/check.py` and `src/tests.rs` use.
+- **Read the screen** at a mark with `$SKILL/scripts/look.py` (see Helpers). Assert on `text` and `label`, and treat text with `ink` under 0.5 as unreadable. That is the floor `tools/check.py` and `src/tests/` use.
 - **The named checks** are `python3 tools/check.py SCRIPT ...` for the checks on one script, plus the probes `pixels`, `bell-light` and `text-swap`. An unknown name fails. Run the checks for the scripts a change touches. `tools/ci.sh` runs everything and is CI's job.
-- **The Rust tests** in `src/tests.rs` drive the same handlers through Rune's `Runtime` with no GPU, including relaunch from what was saved. Run one by name: `cargo test --release space_starts_pauses_and_resumes_the_sunset`.
+- **The Rust tests** in `src/tests/` drive the same handlers through Rune's `Runtime` with no GPU, including relaunch from what was saved. Run one by name: `cargo test --release space_starts_pauses_and_resumes_the_sunset`.
 
 Prefer element keys (`control-play`, `day-lantern-0`, `detail-rename`) to coordinates. The sky has no single key target that stays clear of the readout, so scripts tap it at `190,200`.
 
@@ -54,7 +54,7 @@ RUN=shots/verify/$(date -u +%Y%m%dT%H%M%SZ)-<feature>; mkdir -p "$RUN"
 - `<journey>.mp4` is the journey as a user watches it, with the keys and clicks drawn on. Run `target/release/pomodoro --script S [--scene N] --video "$RUN/<journey>.mp4" --fps 30 --keys --pointer`. Add `--start mark:A --duration 6` to keep a long script short.
 - `check.txt` is the output of `python3 tools/check.py <script>` for the scripts the change touches. Piping through `tee` hides the exit code, so the proof fails if `grep -c FAIL "$RUN/check.txt"` prints anything but 0.
 
-A proof follows the user's path. It presses the keys, taps the keyed controls or drags the sun, and never sets state from a test hook. Capture the state before the action and after it, not only the end. For anything saved, also show the second view. That is Today's numbers or labels after the action, or a `src/tests.rs` relaunch test. Headless never touches the real prefs file, so a saved file on disk is a real-window check (below).
+A proof follows the user's path. It presses the keys, taps the keyed controls or drags the sun, and never sets state from a test hook. Capture the state before the action and after it, not only the end. For anything saved, also show the second view. That is Today's numbers or labels after the action, or a `src/tests/` relaunch test. Headless never touches the real prefs file, so a saved file on disk is a real-window check (below).
 
 ## Cleanup
 

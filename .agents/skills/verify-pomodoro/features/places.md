@@ -33,6 +33,6 @@ Preconditions:
 
 - While a block runs and the controls are hidden, `control-place` stays in the accessibility tree and only its look (`control-place-look`) is at opacity 0. A pointer tap there lands on `dock-cover` and does nothing until the controls show.
 - Headless `menu-pick` proves the choice lands. It doesn't show the menu macOS draws, which only the real window shows.
-- The saved place reaches `prefs.json` only in a real launch. No test in `src/tests.rs` relaunches into a saved place, so a change to saving it needs a new test or the real-window checklist.
+- The saved place reaches `prefs.json` only in a real launch. No test in `src/tests/` relaunches into a saved place, so a change to saving it needs a new test or the real-window checklist.
 - The colour change on switching eases over `rune::tok::motion::CALM`. Snap a second or more after the switch to see the settled place.
 - `--theme light|dark` fixes the appearance for the whole run. A live switch is real-window only.

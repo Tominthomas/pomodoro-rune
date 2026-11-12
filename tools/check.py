@@ -48,7 +48,7 @@ SCENE = {
 }
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
-# inherits. src/tests.rs holds the same floor.
+# inherits. src/tests/mod.rs holds the same floor.
 READABLE = 0.5
 
 

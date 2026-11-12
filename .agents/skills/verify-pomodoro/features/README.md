@@ -20,7 +20,7 @@ This directory is the maintained source for verifying what a user sees in Pomodo
 ## Proof and skip reporting
 
 - Keep `look --out` captures from before and after the action, the `tools/check.py <script>` output, and a `--video ... --keys --pointer` of the journey.
-- For a saved change, show it again from a second view, such as Today's numbers, the lantern's label, or a `src/tests.rs` relaunch test.
+- For a saved change, show it again from a second view, such as Today's numbers, the lantern's label, or a `src/tests/` relaunch test.
 - Record the feature file and sub-feature ID with each artifact in `$RUN/log.txt`.
 - If a path can't be driven headless, list it as unverified with the reason from the feature's `Gotchas` or SKILL.md's "Real window". Never report it as verified through a different path.
 
