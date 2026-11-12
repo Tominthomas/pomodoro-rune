@@ -674,6 +674,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
+            let ink = if dark { theme::Ink::light() } else { theme::Ink::dark() };
             let ledger = today::Ledger {
                 log: &s.study.log,
                 cal: s.cal,
@@ -683,8 +684,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 dark,
                 nav,
                 rename: &s.rename,
-                status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
-                    .filter(|_| !s.keys_open),
+                status: readout::status(s, ink, news).filter(|_| !s.keys_open),
+                unsaved: readout::save_status(s, ink),
                 timer: &s.timer,
                 clock: s.now,
             };

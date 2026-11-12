@@ -191,6 +191,11 @@ pub const SCENES: &[(&str, Setup)] = &[
         month(s);
         s.page = Page::Today(crate::today::Nav::default());
     }),
+    ("unsaved", |s| {
+        morning(s);
+        on_water(s, 0);
+        s.save_error = Some("the disk is full".into());
+    }),
     ("controls", |s| {
         morning(s);
         s.timer.done = 0;

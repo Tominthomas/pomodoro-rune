@@ -196,10 +196,15 @@ impl App {
         None
     }
 
-    /// The status `VoiceOver` announces, and whether it is news: marked to be read out now.
+    /// The bell's status `VoiceOver` announces, and whether it is news: marked to be read out now.
     fn status(&self) -> Option<(String, bool)> {
+        self.announced("status")
+    }
+
+    /// What the element keyed `key` says to `VoiceOver`, and whether it is read out as it changes.
+    fn announced(&self, key: &str) -> Option<(String, bool)> {
         let tree = self.rt.accessibility_tree();
-        let (_, n) = tree.nodes.iter().find(|(_, n)| n.author_id() == Some("status"))?;
+        let (_, n) = tree.nodes.iter().find(|(_, n)| n.author_id() == Some(key))?;
         Some((n.label().unwrap_or_default().to_string(), n.live() == Some(rune::accesskit::Live::Polite)))
     }
 
@@ -386,6 +391,26 @@ fn both_name_fields_say_what_they_name_empty_or_filled() {
     today.tap("detail-rename");
     today.look();
     assert_eq!(field(&today, "detail-label-field"), ("Name for this block".into(), "Reading & notes".into()));
+}
+
+#[test]
+fn a_failed_save_is_shown_where_the_record_changes_and_can_be_tried_again() {
+    let mut app = App::new();
+    app.one_minute();
+    app.block();
+    // What the store reports from its writer thread when a write fails.
+    app.rt.update(|s, _| s.save_error = Some("the disk is full".into()));
+    app.look();
+    let said = Some("Not saved: the disk is full".to_string());
+    assert_eq!(app.read("save-error-text"), said, "on the sunset");
+    assert_eq!(app.announced("save-error-text"), said.clone().map(|s| (s, true)), "and said as it appears");
+    app.char("h");
+    app.look();
+    assert_eq!(app.read("save-error-text"), said, "and in Today, where names and words are changed");
+    app.disk.0.lock().unwrap().clear();
+    app.tap("save-retry");
+    assert_eq!(app.rt.state.store.flush(Duration::from_secs(5)), Ok(()));
+    assert!(app.disk.0.lock().unwrap().contains_key(study::KEY), "Try again writes the record again");
 }
 
 #[test]

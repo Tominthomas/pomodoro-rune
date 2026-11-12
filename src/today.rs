@@ -59,6 +59,8 @@ pub struct Ledger<'a> {
     pub rename: &'a TextEdit,
     /// What the last bell said, until the next phase starts.
     pub status: Option<El>,
+    /// Why the record isn't saved, until a save works.
+    pub unsaved: Option<El>,
     /// The timer as it stands, and the window's clock to read it at.
     pub timer: &'a Timer,
     pub clock: f64,
@@ -250,13 +252,11 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &subtitle, 12.0, 450.0, 0.82).key("today-date")),
         )
         .child(actions.self_start());
-    let page = col()
-        .key("today")
-        .pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0))
-        .child(now_bar(l))
-        .child(el().h(14.0))
-        .child(head)
-        .child(el().h(6.0));
+    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0)).child(now_bar(l));
+    if let Some(unsaved) = l.unsaved.clone() {
+        page = page.child(el().h(8.0)).child(unsaved.w(WIDE));
+    }
+    let page = page.child(el().h(14.0)).child(head).child(el().h(6.0));
     let mut body = col().key("today-body").pb(PAD);
     let opened = l.nav.serial().and_then(|n| blocks.iter().find(|(m, _)| *m == n)).map(|(n, b)| (*n, *b));
     let under = match opened {

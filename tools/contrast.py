@@ -31,6 +31,7 @@ SCENES = {
     "long": "long",
     "evening": "evening",
     "controls": "controls",
+    "unsaved": "unsaved",
     "today": "today",
 }
 TARGET = 4.5

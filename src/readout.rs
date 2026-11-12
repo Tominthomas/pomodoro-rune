@@ -204,10 +204,34 @@ pub fn view(s: &State, k: Ink) -> El {
     if let Some(r) = reflection(s, k) {
         offers = offers.child(r);
     }
-    if let Some(why) = &s.save_error {
-        offers = offers.child(line(k, format!("not saved: {why}"), 10.5, 460.0, QUIET).key("save-error"));
+    if let Some(e) = save_status(s, k) {
+        offers = offers.child(e);
     }
     out.child(el().h(3.0)).child(offers)
+}
+
+/// Why the record isn't saved, wherever it can be changed: on the sunset and in Today. It is said
+/// politely as it appears, offers to save again, and stays until a save works.
+pub fn save_status(s: &State, k: Ink) -> Option<El> {
+    let words = format!("Not saved: {}", s.save_error.as_ref()?);
+    Some(
+        row()
+            .key("save-error")
+            .gap(8.0)
+            .center_y()
+            .child(
+                text(words.clone())
+                    .key("save-error-text")
+                    .role("status")
+                    .label(words)
+                    .live_region(LiveRegion::Polite)
+                    .font(TextStyle::new(SMALL, 540.0))
+                    .color(k.text.alpha(BRIGHT))
+                    .shrink()
+                    .wrap(),
+            )
+            .child(button(k, "save-retry", "Try again", "Save again").on_press_tx(guarded(|s, _| s.save()))),
+    )
 }
 
 /// What the next block is for: a field while it's being named.
