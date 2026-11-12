@@ -267,6 +267,8 @@ pub fn view(l: &Ledger<'_>) -> El {
     let head = row()
         .w(l.span())
         .justify_between()
+        .flex_wrap()
+        .gaps(8.0, 10.0)
         .child(
             col()
                 .gap(1.0)

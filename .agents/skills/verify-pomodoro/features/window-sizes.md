@@ -1,6 +1,6 @@
 # Window sizes and Larger Text
 
-The window resizes from 380 x 540 points up. The sky and the sea fill it, the horizon stays at the same share of the height, and nothing in the scene grows: a bigger window shows more evening. The readout keeps the bottom left and the dock the bottom right. Today centres one column up to 460 points wide, and sets the four weeks beside the day once two 340-point columns fit. Larger Text (View menu, `⌘+`, and `⌘−` to go back) zooms the words and controls 1.25 times and draws the scene back at the window's own scale. It grows a window too small for it to 475 x 675. In a narrow view (under 372 points, such as Larger Text in the smallest window) the dock takes two rows, the readout moves up, the key card scrolls and Today's rows wrap.
+The window resizes from 380 x 540 points up. The sky and the sea fill it, the horizon stays at the same share of the height, and nothing in the scene grows: a bigger window shows more evening. The readout keeps the bottom left and the dock the bottom right. Today centres one column up to 460 points wide, and sets the four weeks beside the day once two 340-point columns fit. Larger Text (View menu, `⌘+`, and `⌘−` to go back) zooms the words and controls 1.25 times and draws the scene back at the window's own scale. It grows a window too small for it to 475 x 675. In a narrow view (under 372 points, such as Larger Text in the smallest window) the dock takes two rows, the readout moves up, the key card scrolls and Today's rows wrap: a past day's two ways back go under its name, and a hovered day's summary under the four weeks' dates.
 
 ## Sub-features
 
@@ -23,6 +23,7 @@ Preconditions:
 - The baseline from `README.md`. `--size WxH` launches at that size; a script's `{"type":"resize","dw":-95,"dh":-135,"dur":0.05}` resizes the window as a person would. A `--snap` keeps the launch size, so make a window that grew small again before snapping it.
 
 - **Every size.** Run `python3 tools/check.py size-tall size-wide size-larger size-larger-small`. Each script waits, starts a block with the controls out, opens the keys, opens Today and scrolls to the four weeks. The checks assert nothing is cut or drawn over another, Pause takes Start's place, and the four weeks are reachable.
+- **History in the narrow view.** Run `python3 tools/check.py history-larger-small`. On four weeks of history with Larger Text in the smallest window, it hovers Tuesday 10 November in the grid and then opens Wednesday 4 November. The checks assert the summary and both ways back fit.
 - **One moment.** Run `app --script scripts/size-wide.json --size 900x600 --snap $RUN/wide-today.png --at mark:today` and look at it: the four weeks stand beside the day.
 - **Larger Text grows the window.** `python3 tools/check.py size-larger-small` checks the `grown` mark: the view is 380 x 540 of its points, so the window is 475 x 675.
 - **Contrast.** `python3 tools/contrast.py` measures five moments at each size in every place, light and dark, besides the first-size pack.
