@@ -457,6 +457,29 @@ fn a_name_being_typed_keeps_its_letters_even_when_its_field_lost_focus() {
 }
 
 #[test]
+fn todays_marks_say_they_open_their_block_and_the_cue_goes_once_one_is_opened() {
+    let mut app = App::new();
+    app.one_minute();
+    app.block();
+    app.char("h");
+    app.look();
+    let name = |app: &App| app.node("day-lantern-0").unwrap()["name"].as_str().unwrap().to_string();
+    assert!(name(&app).starts_with("Open block: 14:00 – 14:01 · 1 min"), "{}", name(&app));
+    assert_eq!(app.read("strip-cue").as_deref(), Some("Select a lantern or ring to open the block"));
+    app.tap("day-lantern-0");
+    app.look();
+    assert!(name(&app).starts_with("Close block: "), "open, the mark closes it: {}", name(&app));
+    assert!(!app.has("strip-cue"), "the cue has done its work");
+    app.tap("day-lantern-0");
+    app.look();
+    assert!(app.has("strip-key") && !app.has("strip-cue"), "and stays away once the block is closed");
+    let mut back = app.relaunch(60.0);
+    back.char("h");
+    back.look();
+    assert!(back.has("strip-key") && !back.has("strip-cue"), "and after a relaunch");
+}
+
+#[test]
 fn today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first() {
     let mut app = App::new();
     app.one_minute();
@@ -686,7 +709,7 @@ fn a_still_window_wakes_for_the_bell_it_owes() {
     app.char("h");
     app.look();
     let lantern = app.node("day-lantern-0").expect("the block is in Today");
-    assert!(lantern["name"].as_str().unwrap().starts_with("14:00 – 14:01 · 1 min"), "{lantern}");
+    assert!(lantern["name"].as_str().unwrap().starts_with("Open block: 14:00 – 14:01 · 1 min"), "{lantern}");
 }
 
 #[test]

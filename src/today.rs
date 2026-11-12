@@ -38,9 +38,6 @@ pub const MONTHS: [&str; 12] = [
     "November",
     "December",
 ];
-/// What the strip's marks mean, on each mark's tooltip.
-const LANTERN: &str = "a lantern is a block finished";
-const RING: &str = "a ring is the minutes kept after a skip";
 /// The strip's viewport, which a crowded day scrolls sideways.
 pub const STRIP: &str = "day-strip-view";
 
@@ -61,6 +58,8 @@ pub struct Ledger<'a> {
     pub status: Option<El>,
     /// Why the record isn't saved, until a save works.
     pub unsaved: Option<El>,
+    /// Whether to say that a mark opens its block: until one has been opened.
+    pub cue: bool,
     /// The timer as it stands, and the window's clock to read it at.
     pub timer: &'a Timer,
     pub clock: f64,
@@ -265,6 +264,12 @@ pub fn view(l: &Ledger<'_>) -> El {
             label(k, "No blocks yet today. The sea is calm.", 11.5, 450.0, 0.82).key("strip-note")
         }
         None if blocks.is_empty() => label(k, "No blocks this day.", 11.5, 450.0, 0.82).key("strip-note"),
+        None if l.cue => col().gap(6.0).child(key_row(k)).child(
+            label(k, "Select a lantern or ring to open the block", 10.5, 460.0, 0.82)
+                .key("strip-cue")
+                .max_w(WIDE)
+                .wrap(),
+        ),
         None => key_row(k),
     };
     body = body.child(el().h(2.0)).child(strip(l, &blocks)).child(under).child(el().h(14.0));
@@ -512,8 +517,10 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
         let x = x.round();
         let spoken = format!("{}, {}", when(l.cal, b), about(b).join(", "));
         let picked = l.nav.serial() == Some(serial);
-        // Every mark takes a press over at least `HIT` square, and lights under the pointer.
-        let target = |key: String, y: f32, meaning: &str| {
+        // Every mark takes a press over at least `HIT` square, lights under the pointer, and says
+        // that it opens its block, or closes it once open.
+        let verb = if picked { "Close block" } else { "Open block" };
+        let target = |key: String, y: f32| {
             el().key(key)
                 .absolute(x - HIT / 2.0, y - HIT / 2.0)
                 .size(HIT, HIT)
@@ -521,18 +528,23 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
                 .hover(k.text.alpha(0.16))
                 .fill(k.text.alpha(if picked { 0.16 } else { 0.0 }))
                 .role("button")
-                .label(spoken.clone())
-                .help(format!("{}: {meaning}", when(l.cal, b)))
+                .label(format!("{verb}: {spoken}"))
+                .help(format!("{verb}: {}", when(l.cal, b)))
                 .focusable(true)
                 .focus_ring(1.5, 0.0, k.text.alpha(0.9))
-                .on_press_tx(navigate(move |n| n.toggle(serial)))
+                .on_press_tx(guarded(move |s, _| {
+                    if let Some(n) = nav(s) {
+                        n.toggle(serial);
+                    }
+                    s.learned_marks();
+                }))
         };
         if b.finished() {
             let pose = Pose { scale: 1.15, t: 0.0, seed: 0, bloom: 1.0, glow: 0.4, reflect: true, soft: 4.0 };
             let half = pose.reach() / 2.0;
             let y = base - 14.0 - (lit % 2) as f32 * 7.0;
             // The glow reaches far; only the target around the lantern takes the press.
-            art = art.child(target(format!("day-lantern-{lit}"), y, LANTERN)).child(
+            art = art.child(target(format!("day-lantern-{lit}"), y)).child(
                 lantern::view(format!("day-lantern-art-{lit}"), String::new(), &Lantern::of(b), pose)
                     .absolute(x - half, y - half)
                     .inert()
@@ -545,7 +557,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
                 1.4,
                 k.text.alpha(if picked { 0.95 } else { 0.75 }),
             );
-            art = art.child(target(format!("day-ring-{rings}"), base - 2.0, RING));
+            art = art.child(target(format!("day-ring-{rings}"), base - 2.0));
             rings += 1;
         }
     }

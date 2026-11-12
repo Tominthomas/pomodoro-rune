@@ -111,6 +111,8 @@ pub struct State {
     reflect: Option<Reflect>,
     /// The first-use hint for setting a block's length, until it's been used or put away.
     hint: bool,
+    /// Today's cue that a mark opens its block, until one has been opened.
+    cue_marks: bool,
     page: Page,
     /// The key overlay `?` opens.
     keys_open: bool,
@@ -180,12 +182,13 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let lengths: Lengths = prefs.get("lengths").unwrap_or_default();
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
+    let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.place) = (hint, place);
+    (s.hint, s.cue_marks, s.place) = (hint, cue_marks, place);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -211,6 +214,7 @@ impl State {
             rename: TextEdit::new(String::new()),
             reflect: None,
             hint: false,
+            cue_marks: false,
             page: Page::Scene,
             keys_open: false,
             place: 0,
@@ -336,6 +340,14 @@ impl State {
     /// this, never a frame.
     fn save(&self) {
         self.store.set(study::KEY, self.study.clone());
+    }
+
+    /// A block was opened from Today, so its marks no longer need the cue.
+    fn learned_marks(&mut self) {
+        if self.cue_marks {
+            self.cue_marks = false;
+            self.store.set("opened-block", true);
+        }
     }
 
     fn put_hint_away(&mut self) {
@@ -686,6 +698,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 rename: &s.rename,
                 status: readout::status(s, ink, news).filter(|_| !s.keys_open),
                 unsaved: readout::save_status(s, ink),
+                cue: s.cue_marks,
                 timer: &s.timer,
                 clock: s.now,
             };

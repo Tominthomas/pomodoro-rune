@@ -6,6 +6,7 @@
 
 - `today-open` opens Today with `H` or the `control-today` control (labelled Today) and closes it with `H`, `Esc` or `today-close` (Back to sunset). The `timer-bar` at the top shows the running timer and takes Pause, Resume, Start and Undo skip.
 - `today-numbers` shows `stat-focused-value`, `stat-lanterns-value` and `stat-skipped-value`, the `day-lantern-N` and `day-ring-N` marks, `for-<label>` and `reflected`.
+- `today-marks` names each mark `Open block: <time, duration, …>` (`Close block: …` while it is open), and until a block has been opened, `strip-cue` under `strip-key` reads `Select a lantern or ring to open the block`. The `opened-block` pref keeps it away after that. Headless runs start with the cue, since their prefs are empty.
 - `today-detail` opens a block from its mark into `detail`, with `detail-when` and `detail-about`.
 - `today-felt` gives, changes or clears a block's feeling with `detail-felt-deep`, `detail-felt-steady` and `detail-felt-drifting`.
 - `today-rename` renames a block with `detail-rename` and `detail-label-field`.
