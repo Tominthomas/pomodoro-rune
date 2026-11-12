@@ -7,10 +7,10 @@
 
 use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
-use rune::{El, PopupMenu, Tx, canvas, col, el, row, text};
+use rune::{El, PopupMenu, ScrollSpec, Tx, canvas, col, el, row, text};
 
 use crate::readout::{BRIGHT, QUIET, SMALL, button, line};
-use crate::theme::{Ink, PLACES, Place, rgb};
+use crate::theme::{Frame, Ink, PLACES, Place, rgb};
 use crate::timer::{Clock, Event, Phase, Timer};
 use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
 
@@ -19,6 +19,16 @@ use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
 const MARGIN: f32 = 14.0;
 /// How tall the dock's quieter controls stand.
 const TALL: f32 = 28.0;
+/// Narrower than this, the dock's controls don't fit in one row, so Today, the place and the keys
+/// go on a row above Start: a narrow window, or Larger Text in a small one.
+const ONE_ROW: f32 = 372.0;
+/// How much taller the dock stands in two rows: what the readout above it moves up by.
+pub const SECOND_ROW: f32 = TALL + 6.0;
+
+/// Whether the dock takes two rows in a window `f` wide.
+pub fn two_rows(f: Frame) -> bool {
+    f.w < ONE_ROW
+}
 
 /// Runs a control's action, unless it is the click that brought the window forward. A click
 /// leaves no focus behind, so Space goes back to the timer.
@@ -111,14 +121,14 @@ fn primary(k: Ink, t: &Timer) -> El {
         .child(line(on, press_words(t), 12.0, 600.0, 1.0))
 }
 
-pub fn view(s: &State, k: Ink) -> El {
+pub fn view(s: &State, k: Ink, f: Frame) -> El {
     let shown = s.controls_shown();
     let t = &s.timer;
     let press = act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx));
     let play = docked(k, "control-play", press_words(t), "Space", 17.0, shown, primary(k, t));
     // The controls change places at once as the set changes, so no word ever slides over another;
     // only their looks fade.
-    let mut r = row().key("controls").gap(6.0).center_y().instant_changes();
+    let mut r = row().gap(6.0).center_y().instant_changes();
     if let Some((label, consequence)) = skip_words(t) {
         // Skip is a word, not a glyph, and sits left of the primary control, outside its place.
         let skip = act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx));
@@ -144,8 +154,11 @@ pub fn view(s: &State, k: Ink) -> El {
         .border(1.0, k.text.alpha(0.42))
         .hover(k.text.alpha(0.12))
         .child(text("?").font(TextStyle::new(13.0, 620.0)).color(k.text.alpha(BRIGHT)));
-    let r = r
-        .child(play.on_press_tx(press))
+    let r = r.child(play.on_press_tx(press));
+    let rest = row()
+        .gap(6.0)
+        .center_y()
+        .instant_changes()
         .child(
             docked(k, "control-today", "Today", "H", 14.0, shown, tab(k, "Today"))
                 .on_press_tx(act(|s, tx| open_today(s, true, tx))),
@@ -163,6 +176,12 @@ pub fn view(s: &State, k: Ink) -> El {
             .on_press_tx(act(pick_place)),
         )
         .child(docked(k, "control-keys", "Keys", "?", 14.0, shown, keys).on_press_tx(act(|s, _| s.keys_open = true)));
+    // In two rows Start keeps the bottom right corner, and nothing else ever moves into its place.
+    let controls = if two_rows(f) {
+        col().gap(6.0).items_end().child(rest).child(r)
+    } else {
+        row().gap(6.0).center_y().child(r).child(rest)
+    };
     // The corner itself takes the pointer: resting there keeps the controls out, and a click
     // aimed at a fading control never reaches the sky behind it. While they are hidden a cover
     // over them takes the click instead.
@@ -179,7 +198,7 @@ pub fn view(s: &State, k: Ink) -> El {
                 tx.wake_at(s.controls_until);
             }
         })
-        .child(r);
+        .child(controls.key("controls"));
     if shown {
         dock
     } else {
@@ -236,8 +255,10 @@ const KEYS: [(&str, &[(&str, &str)]); 3] = [
     ),
 ];
 
-/// Every key on one card, over a dimmed scene, and under them the last bell's words.
-pub fn keys(status: Option<El>) -> El {
+/// Every key on one card, over a dimmed scene, and under them the last bell's words. In a window
+/// too small for it the card narrows, and the keys scroll inside it.
+pub fn keys(status: Option<El>, f: Frame) -> El {
+    let wide = (f.w - 24.0).min(324.0);
     // Each row wraps its description and grows, so nothing runs past the card.
     let mut n = 0;
     let groups = KEYS.iter().fold(col().gap(14.0), |c, (group, rows)| {
@@ -255,7 +276,7 @@ pub fn keys(status: Option<El>) -> El {
                             .font(TextStyle::new(SMALL, 450.0))
                             .color(Ink::light().text.alpha(QUIET))
                             .wrap()
-                            .w(214.0),
+                            .w(wide - 110.0),
                     ),
             )
         });
@@ -267,9 +288,10 @@ pub fn keys(status: Option<El>) -> El {
                 .child(rows),
         )
     });
+    // The card's head stays put; what it says scrolls in whatever height the window leaves.
     let card = col()
         .key("keys")
-        .w(324.0)
+        .w(wide)
         .padding(20.0)
         .radius(16.0)
         .fill(rgb(0x0d1128).alpha(0.95))
@@ -280,13 +302,21 @@ pub fn keys(status: Option<El>) -> El {
             button(Ink::light(), "keys-close", "Close", "Close  Esc").on_press_tx(guarded(|s, _| s.keys_open = false)),
         ))
         .child(
-            text(ABOUT)
-                .key("keys-about")
-                .font(TextStyle::new(SMALL, 450.0))
-                .color(Ink::light().text.alpha(BRIGHT))
-                .wrap(),
-        )
-        .child(groups);
+            col()
+                .key("keys-scroll")
+                .max_h(f.h - 112.0)
+                .scroll(ScrollSpec { stick_bottom: false })
+                .scroll_edge_fade(14.0)
+                .gap(14.0)
+                .child(
+                    text(ABOUT)
+                        .key("keys-about")
+                        .font(TextStyle::new(SMALL, 450.0))
+                        .color(Ink::light().text.alpha(BRIGHT))
+                        .wrap(),
+                )
+                .child(groups),
+        );
     let card = match status {
         Some(words) => card.child(words),
         None => card,

@@ -623,9 +623,9 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .child(sky)
                 .child(readout::scrim(k, frame))
                 .child(readout::view(s, k, frame))
-                .child(controls::view(s, k));
+                .child(controls::view(s, k, frame));
             match status {
-                Some(e) => root.child(e.absolute(24.0, frame.h - 184.0)),
+                Some(e) => root.child(e.absolute(24.0, frame.h - readout::top(frame))),
                 None => root,
             }
         }
@@ -654,7 +654,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .child(today::view(&ledger).key("ledger").transition(Transition::blur_replace()))
         }
     };
-    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news))) } else { page }
+    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news), frame)) } else { page }
 }
 
 /// The window became the key window or stopped being it.

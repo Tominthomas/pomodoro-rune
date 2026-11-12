@@ -297,12 +297,15 @@ pub fn view(l: &Ledger<'_>) -> El {
         None => key_row(k, l.wide),
     };
     body = body.child(el().h(2.0)).child(strip(l, &blocks)).child(under).child(el().h(14.0));
-    let mut numbers = row().gap(28.0).child(stat(k, "focused", &duration(totals.focused), "focus logged")).child(stat(
-        k,
-        "lanterns",
-        &totals.lanterns.to_string(),
-        if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
-    ));
+    let mut numbers =
+        row().gaps(10.0, 28.0).flex_wrap().child(stat(k, "focused", &duration(totals.focused), "focus logged")).child(
+            stat(
+                k,
+                "lanterns",
+                &totals.lanterns.to_string(),
+                if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
+            ),
+        );
     if totals.skipped() > 0 {
         numbers = numbers.child(stat(k, "skipped", &totals.skipped().to_string(), "skipped"));
     }
@@ -363,7 +366,8 @@ fn key_row(k: Ink, wide: f32) -> El {
     row()
         .key("strip-key")
         .w(wide)
-        .gap(14.0)
+        .gaps(6.0, 14.0)
+        .flex_wrap()
         .center_y()
         .child(mark("key-lantern", lit, "a block finished"))
         .child(mark("key-ring", skipped, "skipped, minutes kept"))

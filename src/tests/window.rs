@@ -63,3 +63,25 @@ fn larger_text_draws_words_and_controls_bigger_keeps_the_scene_and_is_remembered
     back.look();
     assert_eq!((back.rt.zoom(), back.rect("sun")), (1.0, sun), "⌘− puts it back");
 }
+
+#[test]
+fn larger_text_in_the_smallest_window_takes_two_rows_and_keeps_everything_inside() {
+    let mut app = App::new();
+    app.command('=');
+    app.look();
+    let (w, h) = (W / 1.25, H / 1.25);
+    let within = |r: [f32; 4]| r[0] >= 0.0 && r[1] >= 0.0 && r[0] + r[2] <= w + 0.5 && r[1] + r[3] <= h + 0.5;
+    let play = app.rect("control-play");
+    assert!(app.rect("control-today")[1] + 20.0 < play[1], "Today sits on a row above Start");
+    app.space();
+    app.wait(1.0);
+    assert_eq!(app.rect("control-play"), play, "Pause takes Start's place");
+    for key in ["controls", "control-skip", "time", "phase"] {
+        assert!(within(app.rect(key)), "{key} is inside the window: {:?}", app.rect(key));
+    }
+    let (phase, skip) = (app.rect("phase"), app.rect("control-today"));
+    assert!(phase[1] + phase[3] < skip[1], "the readout stays above the dock");
+    app.char("?");
+    app.look();
+    assert!(within(app.rect("keys")), "the key card fits: {:?}", app.rect("keys"));
+}
