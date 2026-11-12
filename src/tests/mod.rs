@@ -99,6 +99,21 @@ impl App {
         self.wait(0.5);
     }
 
+    /// The window resized to `w` by `h` points, as a person drags its corner, and drawn again.
+    fn resize(&mut self, w: f32, h: f32) {
+        self.rt.set_viewport((w, h), 1.0);
+        self.look();
+    }
+
+    /// Where the element keyed `key` is drawn: `[x, y, w, h]` in window points.
+    fn rect(&self, key: &str) -> [f32; 4] {
+        self.rt
+            .elements()
+            .into_iter()
+            .find(|e| e.key.as_deref() == Some(key))
+            .map_or_else(|| panic!("{key} is drawn"), |e| e.rect)
+    }
+
     fn key(&mut self, key: Key) {
         self.rt.key(KeyEvent { key, mods: Mods::default() });
         self.wait(STEP);
@@ -235,3 +250,4 @@ impl App {
 mod dock;
 mod ledger;
 mod sunset;
+mod window;

@@ -5,7 +5,7 @@ description: Drive the pomodoro-rune macOS app (the Rune sunset pomodoro timer) 
 
 # Verify pomodoro
 
-The surface is one fixed 380 x 540 point macOS window. Headless mode runs the real release binary with the real view, key handlers and renderer. Only the window, the clock and storage are swapped. Headless runs start at 14:00 UTC on Wednesday 11 November 2026 and keep their prefs in memory, so a run never reads or writes `~/Library/Application Support/dev.tomin.pomodoro/prefs.json`. Any number of headless runs can go side by side.
+The surface is one resizable macOS window, 380 x 540 points at its smallest and at first launch. Headless runs render at 380 x 540 unless `--size WxH` gives another size; the scene fills it, the readout and the dock keep their corners, and Today sets two columns once it is about 760 points wide. Headless mode runs the real release binary with the real view, key handlers and renderer. Only the window, the clock and storage are swapped. Headless runs start at 14:00 UTC on Wednesday 11 November 2026 and keep their prefs in memory, so a run never reads or writes `~/Library/Application Support/dev.tomin.pomodoro/prefs.json`. Any number of headless runs can go side by side.
 
 Commands run from the repo root. `$SKILL` is `.agents/skills/verify-pomodoro`.
 
@@ -75,7 +75,7 @@ Headless can't show these. Verify them in the real window or list them as unveri
 - The click that brings an inactive window forward. Headless fakes it with `{"focus":false}` then `{"focus":true}`, but the real activation timing isn't covered.
 - The last save being flushed to `prefs.json` on quit, and the saved file read back on the next launch.
 - Notifications posted when the window isn't in front. They need an app bundle.
-- Window chrome, dragging the window, resizing (once it exists), the Dock icon and the app icon.
+- Window chrome, dragging the window, live resizing with the pointer, the frame remembered across launches (`rune_mac::remember_frame`), the Dock icon and the app icon. Headless `--size` proves each size's layout, not the drag between them.
 - Following the system appearance live. Headless takes `--theme` once.
 
 The agent shell here runs in Tomin's Aqua login session (`launchctl managername` prints `Aqua`). It has no Screen Recording permission (`screencapture -x` fails with "could not create image from display"). System Events scripting fails too (`osascript` gives syntax error -2741 on `application process`). So no agent has driven or captured the real window yet. Hand Tomin this checklist with the build and ask for a screenshot of each step.

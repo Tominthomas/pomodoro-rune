@@ -23,19 +23,19 @@ use std::time::Duration;
 
 use rune::prefs::Prefs;
 use rune::time::{SystemTime, UNIX_EPOCH};
-use rune::{
-    AppHandle, AppSpec, Cx, Drag, El, Key, KeyEvent, Phase as DragPhase, TextEdit, Transition, Tx, WindowOptions, el,
-};
+use rune::{AppHandle, AppSpec, Cx, Drag, El, Key, KeyEvent, Phase as DragPhase, TextEdit, Transition, Tx, el};
 
 use lantern::Lantern;
 use log::{Block, Calendar, Day, Felt};
 use scene::{Dawn, Scene, Sky};
 use store::Store;
 use study::Study;
-use theme::{H, PLACES, Place, W};
+use theme::{Frame, H, PLACES, Place, W};
 use timer::{Clock, Effect, Event, Lengths, Phase, RING, Timer};
 
 const APP_ID: &str = "dev.tomin.pomodoro";
+/// The name macOS saves the window's place and size under, between launches.
+const FRAME: &str = "pomodoro";
 /// Headless runs start on a fixed afternoon (Wednesday 11 November 2026, 14:00 UTC), so
 /// scripts and renders read the same everywhere.
 const HEADLESS_EPOCH: f64 = 1_794_405_600.0;
@@ -137,6 +137,8 @@ pub struct State {
     /// forward or putting the name field away, so it does nothing else.
     spent: bool,
     visible: bool,
+    /// macOS has been asked to remember the window's frame; it can't be before the window exists.
+    framed: bool,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
     /// block's morning comes up from there.
     dawn_from: Option<(f64, Dawn)>,
@@ -176,6 +178,8 @@ fn init(handle: AppHandle<State>) -> State {
         }
     });
     s.menu_bar = Some(menu_bar);
+    // A headless run has no window to remember.
+    s.framed = headless;
     s
 }
 
@@ -235,6 +239,7 @@ impl State {
             activated_at: f64::NEG_INFINITY,
             spent: false,
             visible: true,
+            framed: false,
             dawn_from: None,
             reduced: Cell::new(false),
             store,
@@ -433,18 +438,21 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
 }
 
 fn notify(finished: Phase) {
-    if !rune_notify::available() || rune_notify::app_focused() {
+    if !rune_mac::notify::available() || rune_mac::notify::app_focused() {
         return;
     }
     let (title, body) = match finished {
         Phase::Focus => ("A lantern for that one", "The sun's down. Rest a while."),
         Phase::Short | Phase::Long => ("Break's over", "Press start when you're ready for the next sunset."),
     };
-    rune_notify::post(&rune_notify::Notification::new("phase", title).body(body));
+    rune_mac::notify::post(&rune_mac::notify::Notification::new("phase", title).body(body));
 }
 
 fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
     s.now = now;
+    if !s.framed {
+        s.framed = rune_mac::remember_frame(FRAME);
+    }
     let mut changed = false;
     if let Some(timer) = s.study.roll_over(s.cal, s.unix(), &s.timer) {
         s.timer = timer;
@@ -647,6 +655,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     menu::sync(s);
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
+    // The window as the last layout found it; before the first, the size it opens at.
+    let frame = cx.layout_size("window").map_or(Frame::FIRST, |[w, h]| Frame::of(w, h));
     let (water, stars) = s.lanterns();
     // Reduce Motion: a bell or a dawn shows only where it ends.
     let mut sky = Sky::of(&s.timer, s.now, s.dawn().filter(|_| !s.reduced.get()));
@@ -664,9 +674,10 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         water: &water,
         stars: &stars,
         held: matches!(s.timer.clock, Clock::Paused { .. }),
+        frame,
     };
-    let root =
-        el().size(W, H).clip_rounded(0.0).window_drag().on_pointer_move_local(|s: &mut State, _, tx: &mut Tx| {
+    let root = el().key("window").w_full().h_full().clip_rounded(0.0).window_drag().on_pointer_move_local(
+        |s: &mut State, _, tx: &mut Tx| {
             let shown = s.beckoned();
             s.keyboard = false;
             s.controls_until = tx.clock() + CONTROLS_LINGER;
@@ -674,7 +685,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
             if shown {
                 tx.live_only();
             }
-        });
+        },
+    );
     let page = match &s.page {
         Page::Scene => {
             // One sky through every phase: each boundary is continuous, the bell easing into the
@@ -683,22 +695,27 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 .key("sky")
                 .role("none")
                 .absolute(0.0, 0.0)
-                .size(W, H)
+                .size(frame.w, frame.h)
                 .on_drag(drag)
                 .child(scene::view(&scene).key("scene").absolute(0.0, 0.0));
             let k = theme::Ink::on(scene::ground(&scene));
             // The phase line already says it on the scene, so here the status is only heard.
             let status =
                 readout::status(s, k, news).filter(|_| !s.keys_open).map(|e| e.opacity(1.0).color(k.text.alpha(0.0)));
-            let root = root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k));
+            let root = root
+                .child(sky)
+                .child(readout::scrim(k, frame))
+                .child(readout::view(s, k, frame))
+                .child(controls::view(s, k));
             match status {
-                Some(e) => root.child(e.absolute(24.0, H - 184.0)),
+                Some(e) => root.child(e.absolute(24.0, frame.h - 184.0)),
                 None => root,
             }
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
             let ink = if dark { theme::Ink::light() } else { theme::Ink::dark() };
+            let (wide, split) = today::columns(frame);
             let ledger = today::Ledger {
                 log: &s.study.log,
                 cal: s.cal,
@@ -711,6 +728,8 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 status: readout::status(s, ink, news).filter(|_| !s.keys_open),
                 unsaved: readout::save_status(s, ink),
                 cue: s.cue_marks,
+                wide,
+                split,
                 timer: &s.timer,
                 clock: s.now,
             };
@@ -731,6 +750,9 @@ fn on_focus(s: &mut State, key: bool, tx: &mut Tx) {
 
 fn main() {
     rune::prewarm_gpu();
+    // The window opens at the size it last had, so it doesn't open small and then grow; a
+    // headless run always renders at the size it is given.
+    let size = if rune::tooling::headless_run().is_some() { None } else { rune_mac::saved_size(FRAME) };
     let app = rune::App::new(AppSpec::<State> {
         scenes: demo::SCENES,
         fonts: &[include_bytes!("../assets/fonts/Inter.ttf")],
@@ -738,11 +760,10 @@ fn main() {
         poll: Some(poll),
         on_key: Some(on_key),
         min_size: Some((W, H)),
-        ..AppSpec::new("Pomodoro", (W, H), || unreachable!("App::init builds the state"), view)
+        ..AppSpec::new("Pomodoro", size.unwrap_or((W, H)), || unreachable!("App::init builds the state"), view)
     });
     let handle = app.handle();
     app.init(move || init(handle))
-        .window_options(WindowOptions { resizable: false, ..WindowOptions::default() })
         .on_visibility(|s: &mut State, shown, _| s.visible = shown)
         .on_focus(on_focus)
         .on_close(|s: &mut State, _| {

@@ -11,7 +11,7 @@ use rune::{Color, El, Pixels, canvas, el};
 
 use crate::drawing::{disc, halo, hash, ring};
 use crate::lantern::{self, Lantern, Pose};
-use crate::theme::{H, HZ, Pal, Place, W, Water, rgb};
+use crate::theme::{Frame, Pal, Place, Water, rgb};
 use crate::timer::{Clock, Phase, RING, Timer};
 
 /// The sun is the progress, so it is drawn large enough to hold the eye.
@@ -25,8 +25,9 @@ const RISE: f32 = 240.0;
 const UNDER: f32 = 2.0;
 /// How long the bell takes to sink the sun, in seconds.
 const SINK: f32 = 2.6;
-/// The readout's corner of the water, kept calm: no lanterns, and little texture.
-const CALM: [f32; 2] = [250.0, 388.0];
+/// The readout's corner of the water, kept calm: no lanterns, and little texture. It reaches
+/// this far from the left, and this far up from the bottom.
+const CALM: [f32; 2] = [250.0, 152.0];
 
 /// Where the evening is. Derived each frame from the timer, never stored.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -160,17 +161,20 @@ pub struct Scene<'a> {
     pub stars: &'a [Lantern],
     /// Paused: the sky holds its breath under a light cool haze. Lanterns stay as bright.
     pub held: bool,
+    /// The window the scene fills.
+    pub frame: Frame,
 }
 
 #[expect(clippy::too_many_lines, reason = "one scene, painted back to front; splitting it would hide the layer order")]
 pub fn view(s: &Scene<'_>) -> El {
+    let f = s.frame;
     let x = s.sky.axis(s.dark);
     let p = s.place.pal(x);
     let t = s.drift;
     let sun_p = s.sky.sun();
     let rise = rise(f64::from(s.length)) as f32;
     let squash = SUN_R * squash(sun_p);
-    let sun = [W * 0.5 - 4.0 + 34.0 * sun_p.min(1.0), sun_y(sun_p, rise)];
+    let sun = [f.w * 0.5 - 4.0 + 34.0 * sun_p.min(1.0), sun_y(f, sun_p, rise)];
     let sun_vis = ((UNDER + 0.05 - sun_p) / 0.05).clamp(0.0, 1.0);
     let dusk = ((x - 1.0) / 0.7).clamp(0.0, 1.0);
     let night = match s.sky {
@@ -182,9 +186,9 @@ pub fn view(s: &Scene<'_>) -> El {
         _ => None,
     };
     let blue = s.sky.blue();
-    let hz = HZ / H;
+    let hz = f.hz / f.h;
 
-    let sky = el().size(W, H).linear_gradient(
+    let sky = el().size(f.w, f.h).linear_gradient(
         PI,
         [
             (0.0, p.zen),
@@ -197,7 +201,7 @@ pub fn view(s: &Scene<'_>) -> El {
     );
     let glow_k = sun_vis.max(0.35 * (1.0 - dusk));
     let glow = el().pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).radial_gradient(
-        [sun[0] / W, sun[1].min(HZ) / H],
+        [sun[0] / f.w, sun[1].min(f.hz) / f.h],
         [(250.0 + 90.0 * sun_p.min(1.0)) * SUN_SCALE.sqrt(), (150.0 + 40.0 * sun_p.min(1.0)) * SUN_SCALE.sqrt()],
         [
             (0.0, p.glow.alpha(0.75 * glow_k)),
@@ -212,10 +216,10 @@ pub fn view(s: &Scene<'_>) -> El {
     let mut a = Shape::new();
     let star_k = ((x - 1.1) / 0.5).clamp(0.0, 1.0);
     for k in 0..110u32 {
-        let (sx, sy) = (hash(k) * W, hash(k + 500).powf(1.35) * (HZ - 14.0));
+        let (sx, sy) = (hash(k) * f.w, hash(k + 500).powf(1.35) * (f.hz - 14.0));
         let twinkle = 0.55 + 0.45 * (t * (0.5 + hash(k + 9)) + k as f32 * 2.0).sin();
         let r = 0.45 + hash(k + 77).powi(3) * 1.1;
-        a = disc(a, [sx, sy], [r, r], rgb(0xe8ecff).alpha(star_k * twinkle * (1.0 - sy / HZ * 0.6) * 0.85));
+        a = disc(a, [sx, sy], [r, r], rgb(0xe8ecff).alpha(star_k * twinkle * (1.0 - sy / f.hz * 0.6) * 0.85));
     }
     // Today's lanterns come out before the ordinary stars, warm among the cold. The cycle the
     // long break just closed keeps its lanterns' shape aloft until the dawn makes them stars.
@@ -227,7 +231,7 @@ pub fn view(s: &Scene<'_>) -> El {
     };
     let mut aloft_lanterns = Vec::new();
     for (i, l) in s.stars.iter().enumerate() {
-        let c = star_at(i);
+        let c = star_at(f, i);
         let shaped = if i + 4 >= s.stars.len() { aloft } else { 0.0 };
         let k = warm_k * (0.85 + 0.15 * (t * 0.7 + i as f32 * 1.3).sin()) * (1.0 - shaped);
         soft = halo(soft, c, 6.0, 1.0, l.tone, 0.7 * warm_k * (1.0 - shaped));
@@ -246,22 +250,22 @@ pub fn view(s: &Scene<'_>) -> El {
     // break: the break's own clock.
     let venus = ((x - 1.08) / 0.2).clamp(0.0, 1.0) * s.sky.venus();
     if venus > 0.0 {
-        let v = [W * 0.27, HZ - 128.0 + 46.0 * blue.unwrap_or(0.0)];
+        let v = [f.w * 0.27, f.hz - 128.0 + 46.0 * blue.unwrap_or(0.0)];
         soft = halo(soft, v, 10.0 + 6.0 * venus, 1.0, rgb(0xfff4e0), venus * 0.9);
         a = disc(a, v, [1.5 + 0.6 * venus, 1.5 + 0.6 * venus], rgb(0xfffaf0).alpha(venus));
     }
     // The moon climbs through the whole long break, so how high it stands is how far the
     // break has gone; at dawn it sets.
     let moon = match (night, dawn) {
-        (Some(n), _) => Some(HZ + 16.0 - ease(n) * 200.0),
-        (_, Some(d)) => Some(HZ - 184.0 + ease(d / 0.6) * 214.0),
+        (Some(n), _) => Some(f.hz + 16.0 - ease(n) * 200.0),
+        (_, Some(d)) => Some(f.hz - 184.0 + ease(d / 0.6) * 214.0),
         _ => None,
     };
     // It clears the horizon as it rises and sinks behind it as it sets: never a pop.
-    let moon_k = moon.map_or(0.0, |my| ((HZ - 6.0 - my) / 22.0).clamp(0.0, 1.0));
+    let moon_k = moon.map_or(0.0, |my| ((f.hz - 6.0 - my) / 22.0).clamp(0.0, 1.0));
     if let Some(my) = moon {
         let k = moon_k;
-        let m = [W * 0.74, my];
+        let m = [f.w * 0.74, my];
         soft = halo(soft, m, 54.0, 1.0, rgb(0xcfd6f5), 0.5 * k);
         a = disc(a, m, [15.0, 15.0], rgb(0xf3eedf).alpha(k));
         a = disc(a, [m[0] + 4.0, m[1] - 3.0], [3.0, 2.6], rgb(0xdcd5c3).alpha(k));
@@ -282,14 +286,14 @@ pub fn view(s: &Scene<'_>) -> El {
             a = disc(a, [sun[0], sun[1] - 2.0 * (1.0 - f) * 4.0], [SUN_R * f, squash * f], core.alpha(sun_vis * 0.12));
         }
     }
-    let land = s.place.land(Shape::new(), &p);
+    let land = s.place.land(Shape::new(), &p, f);
 
     // The cycle's lanterns: on the water, or rising into today's sky through the long break,
     // one after another over minutes, to settle there as a small constellation.
     let mut lanterns = Vec::new();
     let mut sky_lanterns = Vec::new();
     for (i, l) in s.water.iter().enumerate().take(4) {
-        let (spot, scale) = sea_spot(i);
+        let (spot, scale) = sea_spot(f, i);
         let newest = i + 1 == s.water.len();
         // The newest lantern lights at a size you can read, then settles to its place's size.
         let (bloom, big) = match s.sky {
@@ -301,7 +305,7 @@ pub fn view(s: &Scene<'_>) -> El {
         let (c, scale, glow, reflect) = match night {
             Some(n) => {
                 let rise = ease((n - 0.04 - 0.1 * i as f32) / 0.36);
-                let target = star_at(s.stars.len() + i);
+                let target = star_at(f, s.stars.len() + i);
                 let sway = (t * 0.4 + i as f32 * 1.7).sin() * 5.0 * rise * (1.0 - rise) * 4.0;
                 let c = [
                     spot[0] + (target[0] - spot[0]) * ease(rise * 1.15) + sway,
@@ -316,14 +320,14 @@ pub fn view(s: &Scene<'_>) -> El {
         let half = pose.reach() / 2.0;
         let lantern =
             lantern::view(format!("lantern-{i}"), lantern_label(i, l), l, pose).absolute(c[0] - half, c[1] - half);
-        if c[1] < HZ - 2.0 { sky_lanterns.push(lantern) } else { lanterns.push(lantern) }
+        if c[1] < f.hz - 2.0 { sky_lanterns.push(lantern) } else { lanterns.push(lantern) }
     }
 
     // The painting is decoration to assistive technology; only the lanterns say anything.
     let stage = sky
         .child(glow.a11y_hidden())
-        .child(canvas(soft).absolute(0.0, 0.0).size(W, H).blur(7.0).cache().a11y_hidden())
-        .child(canvas(a).absolute(0.0, 0.0).size(W, H).a11y_hidden())
+        .child(canvas(soft).absolute(0.0, 0.0).size(f.w, f.h).blur(7.0).cache().a11y_hidden())
+        .child(canvas(a).absolute(0.0, 0.0).size(f.w, f.h).a11y_hidden())
         // The sun's box, for tools that check where it stands; it draws nothing.
         .child(
             el().key("sun")
@@ -332,17 +336,18 @@ pub fn view(s: &Scene<'_>) -> El {
                 .opacity(sun_vis)
                 .a11y_hidden(),
         )
-        .child(clouds(&p, sun_p, dusk, t).a11y_hidden())
-        .child(canvas(land).absolute(0.0, 0.0).size(W, H).a11y_hidden());
+        .child(clouds(f, &p, sun_p, dusk, t).a11y_hidden())
+        .child(canvas(land).absolute(0.0, 0.0).size(f.w, f.h).a11y_hidden());
     // Every layer is drawn in every phase, empty when it has nothing to show, so the scene keeps
     // one shape and nothing is matched against a different layer as a phase ends.
-    let mut stage = stage.child(afterglow(s.place, blue.unwrap_or(0.0), s.sky.afterglow()).a11y_hidden());
+    let mut stage = stage.child(afterglow(f, s.place, blue.unwrap_or(0.0), s.sky.afterglow()).a11y_hidden());
     stage = sky_lanterns.into_iter().chain(aloft_lanterns).fold(stage, El::child);
     stage =
         stage.child(water(s, &p, sun, sun_p, sun_vis, glow_k, moon.map(|_| moon_k).filter(|k| *k > 0.0)).a11y_hidden());
-    stage =
-        stage.child(canvas(ripple(s.sky, sun[0])).key("ripple").absolute(0.0, 0.0).size(W, H).blur(0.8).a11y_hidden());
-    stage = stage.child(grain(W, H));
+    stage = stage.child(
+        canvas(ripple(f, s.sky, sun[0])).key("ripple").absolute(0.0, 0.0).size(f.w, f.h).blur(0.8).a11y_hidden(),
+    );
+    stage = stage.child(grain(f.w, f.h));
     stage = stage.child(
         el().key("dusk-veil")
             .a11y_hidden()
@@ -365,37 +370,39 @@ pub fn view(s: &Scene<'_>) -> El {
     reason = "one surface's layers, painted back to front; splitting it would hide their order"
 )]
 fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k: f32, moon: Option<f32>) -> El {
+    let f = s.frame;
     let t = s.drift;
-    let depth = H - HZ;
+    let depth = f.h - f.hz;
     let kind = s.place.water;
     let stops = sea(kind, p);
     let (refl_x, refl) = match moon {
         Some(k) => (0.74, rgb(0xb8c2ea).alpha(0.22 * k)),
-        None => (sun[0] / W, p.glow.alpha(0.45 * glow_k)),
+        None => (sun[0] / f.w, p.glow.alpha(0.45 * glow_k)),
     };
 
     // Everything mirrored or lying on the surface, clipped to the water.
     let mut w = Shape::new();
     match kind {
         Water::Swell => {}
-        Water::Mirror => w = s.place.reflection(w, p, 0.8),
-        Water::Salt => w = s.place.reflection(w, p, 0.55),
+        Water::Mirror => w = s.place.reflection(w, p, 0.8, f),
+        Water::Salt => w = s.place.reflection(w, p, 0.55, f),
     }
     if moon.is_none() && sun_vis > 0.0 && kind != Water::Swell {
         // A still surface shows the sun broken into soft horizontal streaks, each pushed a
         // little sideways by the water and fainter the further from the horizon.
         let sq = SUN_R * squash(sun_p);
-        let m = [sun[0], 2.0 * HZ - sun[1]];
+        let m = [sun[0], 2.0 * f.hz - sun[1]];
         // Seen from the shore, only a sun low in the sky shows near enough to read.
-        let k = if kind == Water::Mirror { 0.5 } else { 0.6 } * ((HZ + 100.0 - m[1]) / 50.0).clamp(0.0, 1.0) * sun_vis;
+        let k =
+            if kind == Water::Mirror { 0.5 } else { 0.6 } * ((f.hz + 100.0 - m[1]) / 50.0).clamp(0.0, 1.0) * sun_vis;
         let tone = p.sun.mix(p.glow, 0.3);
         for j in 0..14 {
-            let f = (j as f32 + 0.5) / 14.0;
-            let y = m[1] - sq * 0.95 + f * sq * 1.9;
-            let across = (1.0 - (2.0 * f - 1.0).powi(2)).sqrt();
+            let along = (j as f32 + 0.5) / 14.0;
+            let y = m[1] - sq * 0.95 + along * sq * 1.9;
+            let across = (1.0 - (2.0 * along - 1.0).powi(2)).sqrt();
             let half = SUN_R * across * (0.75 + 0.35 * hash(j + 600));
             let shift = (t * 0.5 + j as f32 * 1.9).sin() * 3.0 + (hash(j + 610) - 0.5) * 8.0;
-            let fall = 1.0 - ((y - HZ) / (sq * 2.6)).clamp(0.0, 1.0) * 0.7;
+            let fall = 1.0 - ((y - f.hz) / (sq * 2.6)).clamp(0.0, 1.0) * 0.7;
             w = w.line(
                 [m[0] - half + shift, y],
                 [m[0] + half + shift, y],
@@ -406,25 +413,25 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
         }
     }
     let mut b = Shape::new();
-    b = b.line([0.0, HZ + 0.5], [W, HZ + 0.5], 1.0, LineCap::Butt, p.low.mix(rgb(0xffffff), 0.3).alpha(0.22));
+    b = b.line([0.0, f.hz + 0.5], [f.w, f.hz + 0.5], 1.0, LineCap::Butt, p.low.mix(rgb(0xffffff), 0.3).alpha(0.22));
     let foam = p.low.mix(rgb(0xffffff), 0.4);
     match kind {
         Water::Swell => {
             // Swell lines, denser toward the horizon.
             for k in 0..26u32 {
                 let fy = (k as f32 + 0.5) / 26.0;
-                let y = HZ + 3.0 + fy.powf(1.8) * depth;
+                let y = f.hz + 3.0 + fy.powf(1.8) * depth;
                 for j in 0..4u32 {
                     let id = k * 7 + j;
                     let len = (8.0 + 26.0 * fy) * (0.6 + hash(id + 1));
                     let dir = if j % 2 == 0 { 1.0 } else { -0.6 };
-                    let sx = (hash(id) * (W + 60.0) + t * (2.0 + 4.0 * fy) * dir).rem_euclid(W + 60.0) - 30.0;
+                    let sx = (hash(id) * (f.w + 60.0) + t * (2.0 + 4.0 * fy) * dir).rem_euclid(f.w + 60.0) - 30.0;
                     b = b.line(
                         [sx, y],
                         [sx + len, y],
                         0.8 + 1.2 * fy,
                         LineCap::Round,
-                        foam.alpha((0.05 + 0.06 * fy) * calm(sx, y)),
+                        foam.alpha((0.05 + 0.06 * fy) * calm(f, sx, y)),
                     );
                 }
             }
@@ -433,16 +440,16 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
             // A few long, slow ripples on still water.
             for k in 0..7u32 {
                 let fy = (k as f32 + 0.5) / 7.0;
-                let y = HZ + 6.0 + fy.powf(1.5) * depth * 0.9;
+                let y = f.hz + 6.0 + fy.powf(1.5) * depth * 0.9;
                 let len = 60.0 + 120.0 * hash(k + 40);
-                let sx = (hash(k + 41) * (W + len) + t * 1.2).rem_euclid(W + len) - len;
-                b = b.line([sx, y], [sx + len, y], 0.7, LineCap::Round, foam.alpha(0.07 * calm(sx + len / 2.0, y)));
+                let sx = (hash(k + 41) * (f.w + len) + t * 1.2).rem_euclid(f.w + len) - len;
+                b = b.line([sx, y], [sx + len, y], 0.7, LineCap::Round, foam.alpha(0.07 * calm(f, sx + len / 2.0, y)));
             }
         }
         Water::Salt => {
             // Salt crust in the foreground: faint polygons where the water is thinnest.
             for k in 0..10u32 {
-                let c = [hash(k + 60) * W, HZ + 80.0 + hash(k + 61) * (depth - 80.0)];
+                let c = [hash(k + 60) * f.w, f.hz + 80.0 + hash(k + 61) * (depth - 80.0)];
                 let r = 16.0 + 20.0 * hash(k + 62);
                 let turn = hash(k + 63) * TAU;
                 // Uneven sides, as a crust cracks, and only part of each outline shows.
@@ -453,14 +460,14 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
                         [c[0] + r * a.cos(), c[1] + r * 0.28 * a.sin()]
                     })
                     .collect();
-                b = b.stroke(cell, 0.7, foam.alpha(0.035 * calm(c[0], c[1])));
+                b = b.stroke(cell, 0.7, foam.alpha(0.035 * calm(f, c[0], c[1])));
             }
             // Heat shimmer: the air over the flat wavers along the horizon while the sun is up.
             let heat = (1.0 - x_of(s) / 1.05).clamp(0.0, 1.0);
             for k in 0..9u32 {
-                let y = HZ - 3.0 + k as f32 * 1.4;
+                let y = f.hz - 3.0 + k as f32 * 1.4;
                 let len = 24.0 + 40.0 * hash(k + 80);
-                let sx = hash(k + 81) * (W - len) + (t * 2.1 + k as f32 * 1.7).sin() * 3.0;
+                let sx = hash(k + 81) * (f.w - len) + (t * 2.1 + k as f32 * 1.7).sin() * 3.0;
                 b = b.line(
                     [sx, y],
                     [sx + len, y],
@@ -475,10 +482,10 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
     if moon.is_none() && sun_vis > 0.0 {
         let reach = if kind == Water::Swell { 0.35 + 0.65 * sun_p.min(1.0) } else { 0.25 + 0.3 * sun_p.min(1.0) };
         let width = s.place.glitter * SUN_SCALE.sqrt() * (1.0 - 0.3 * sun_p.min(1.0));
-        b = glitter(b, sun[0], depth * reach, width, p.sun.mix(rgb(0xffffff), 0.25), sun_vis, t);
+        b = glitter(f, b, sun[0], depth * reach, width, p.sun.mix(rgb(0xffffff), 0.25).alpha(sun_vis), t);
     }
     if let Some(k) = moon {
-        b = glitter(b, W * 0.74, depth * 0.85, s.place.glitter * 0.65, rgb(0xdde3fa), 0.55 * k, t);
+        b = glitter(f, b, f.w * 0.74, depth * 0.85, s.place.glitter * 0.65, rgb(0xdde3fa).alpha(0.55 * k), t);
     }
 
     // The lake breathes a low mist over still water; the salt flat lays the sky's glow out in
@@ -486,16 +493,16 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
     let haze = match kind {
         Water::Mirror => {
             let mist = p.low.mix(rgb(0xe8f2f0), 0.55).alpha(0.16 + 0.18 * ((x_of(s) - 0.6) / 0.9).clamp(0.0, 1.0));
-            el().key("haze").absolute(0.0, HZ - 26.0).size(W, 64.0).linear_gradient(
+            el().key("haze").absolute(0.0, f.hz - 26.0).size(f.w, 64.0).linear_gradient(
                 PI,
                 [(0.0, mist.alpha(0.0)), (0.42, mist), (0.6, mist.alpha(mist.a * 0.7)), (1.0, mist.alpha(0.0))],
             )
         }
         Water::Salt => {
             let band = p.glow.alpha(0.42 * (1.0 - ((x_of(s) - 1.2) / 0.5).clamp(0.0, 1.0)));
-            el().key("haze").absolute(0.0, HZ).size(W, 70.0).radial_gradient(
+            el().key("haze").absolute(0.0, f.hz).size(f.w, 70.0).radial_gradient(
                 [0.5, 0.0],
-                [W * 0.75, 26.0],
+                [f.w * 0.75, 26.0],
                 [(0.0, band), (0.6, band.alpha(band.a * 0.4)), (1.0, band.alpha(0.0))],
             )
         }
@@ -503,21 +510,21 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
     };
     el().key("water")
         .absolute(0.0, 0.0)
-        .size(W, H)
+        .size(f.w, f.h)
         .child(
-            el().absolute(0.0, HZ)
-                .size(W, depth)
+            el().absolute(0.0, f.hz)
+                .size(f.w, depth)
                 .clip_rounded(0.0)
                 .linear_gradient(PI, stops)
-                .child(el().absolute(0.0, 0.0).size(W, depth).radial_gradient(
+                .child(el().absolute(0.0, 0.0).size(f.w, depth).radial_gradient(
                     [refl_x, 0.0],
                     [170.0, 150.0],
                     [(0.0, refl), (0.4, refl.alpha(refl.a * 0.35)), (1.0, refl.alpha(0.0))],
                 ))
-                .child(canvas(w).absolute(0.0, -HZ).size(W, H).blur(1.2)),
+                .child(canvas(w).absolute(0.0, -f.hz).size(f.w, f.h).blur(1.2)),
         )
         .child(haze)
-        .child(canvas(b).absolute(0.0, 0.0).size(W, H))
+        .child(canvas(b).absolute(0.0, 0.0).size(f.w, f.h))
 }
 
 /// The water's colour from the horizon down.
@@ -546,18 +553,18 @@ fn x_of(s: &Scene<'_>) -> f32 {
 }
 
 /// Texture fades where the readout sits, so its small text has a quiet ground.
-fn calm(x: f32, y: f32) -> f32 {
-    if x < CALM[0] && y > CALM[1] { 0.3 } else { 1.0 }
+fn calm(f: Frame, x: f32, y: f32) -> f32 {
+    if x < CALM[0] && y > f.h - CALM[1] { 0.3 } else { 1.0 }
 }
 
 /// Blue hour's last warmth: a band along the horizon that thins as the break runs out. `k`
 /// brings it in through the bell as the sun's own glow goes.
-fn afterglow(place: &Place, progress: f32, k: f32) -> El {
+fn afterglow(f: Frame, place: &Place, progress: f32, k: f32) -> El {
     let warm = place.pal(1.05).glow;
     let h = 26.0 + 74.0 * (1.0 - progress);
     el().key("afterglow")
-        .absolute(0.0, HZ - h)
-        .size(W, h)
+        .absolute(0.0, f.hz - h)
+        .size(f.w, h)
         .linear_gradient(PI, [(0.0, warm.alpha(0.0)), (1.0, warm.alpha((0.5 * (1.0 - progress) + 0.06) * k))])
 }
 
@@ -611,16 +618,20 @@ fn squash(sun_p: f32) -> f32 {
 
 /// The sun's centre: its lower limb `rise` above the sea at the start, on the water at 1, and
 /// its upper limb at the horizon by `UNDER`.
-fn sun_y(sun_p: f32, rise: f32) -> f32 {
+fn sun_y(f: Frame, sun_p: f32, rise: f32) -> f32 {
     let half = SUN_R * squash(sun_p);
-    if sun_p <= 1.0 { HZ - half - rise * (1.0 - sun_p) } else { HZ - half + (sun_p - 1.0) / (UNDER - 1.0) * 2.0 * half }
+    if sun_p <= 1.0 {
+        f.hz - half - rise * (1.0 - sun_p)
+    } else {
+        f.hz - half + (sun_p - 1.0) / (UNDER - 1.0) * 2.0 * half
+    }
 }
 
 /// Clouds: banks of billows on a flat base, lit from whichever side the sun is on: white
 /// tops and grey bellies in the afternoon, then cool tops over glowing undersides as the sun
 /// goes down. Each is drawn opaque and the layer fades as one, so overlapping billows never
 /// stack into darker bars.
-fn clouds(p: &Pal, sun_p: f32, dusk: f32, t: f32) -> El {
+fn clouds(f: Frame, p: &Pal, sun_p: f32, dusk: f32, t: f32) -> El {
     // Clouds drift a fraction of a point a second, so they move once a second and the blurred
     // layer is redrawn then, not at every frame of glitter.
     let t = t.floor();
@@ -630,13 +641,13 @@ fn clouds(p: &Pal, sun_p: f32, dusk: f32, t: f32) -> El {
     let bright = p.cloud.mix(rgb(0xffffff), 0.35 * (1.0 - below)).mix(p.glow, 0.6 * below * (1.0 - dusk));
     let (top, under) = (bright.mix(shade, below), shade.mix(bright, below));
     for k in 0..5u32 {
-        let y = HZ - 44.0 - hash(k + 31) * 124.0;
+        let y = f.hz - 44.0 - hash(k + 31) * 124.0;
         // Higher banks are nearer, so they're bigger; low ones flatten toward the horizon.
-        let near = ((HZ - y) / 168.0).clamp(0.0, 1.0);
+        let near = ((f.hz - y) / 168.0).clamp(0.0, 1.0);
         let len = (60.0 + hash(k + 3) * 120.0) * (0.6 + 0.6 * near);
         let thick = (4.0 + hash(k + 5) * 5.0) * (0.45 + 0.85 * near);
         let speed = 0.2 + hash(k) * 0.3;
-        let x0 = (hash(k + 11) * (W + len + 40.0) + t * speed).rem_euclid(W + len + 40.0) - len - 20.0;
+        let x0 = (hash(k + 11) * (f.w + len + 40.0) + t * speed).rem_euclid(f.w + len + 40.0) - len - 20.0;
         let billows = 3 + (len / (thick * 1.9)) as u32;
         let skew = 0.8 + 0.4 * hash(k + 70);
         for pass in 0..2 {
@@ -655,12 +666,12 @@ fn clouds(p: &Pal, sun_p: f32, dusk: f32, t: f32) -> El {
             }
         }
     }
-    canvas(sh).absolute(0.0, 0.0).size(W, H).blur(1.7).opacity(0.72 - 0.36 * dusk).cache()
+    canvas(sh).absolute(0.0, 0.0).size(f.w, f.h).blur(1.7).opacity(0.72 - 0.36 * dusk).cache()
 }
 
 /// The bell's ripple, spreading from where the sun meets the water and scaled to it: two
 /// rings for a lantern, one faint ring for a block skipped.
-fn ripple(sky: Sky, x: f32) -> Shape {
+fn ripple(f: Frame, sky: Sky, x: f32) -> Shape {
     let mut rip = Shape::new();
     let Sky::Bell { since, kept, .. } = sky else { return rip };
     let rings: &[f32] = if kept { &[0.0, 0.28] } else { &[0.2] };
@@ -671,26 +682,29 @@ fn ripple(sky: Sky, x: f32) -> Shape {
         }
         let rx = SUN_R * (0.7 + if kept { 3.2 } else { 2.2 } * ease(k));
         let a = if kept { 0.55 } else { 0.3 } * (1.0 - k) * (k * 8.0).min(1.0);
-        rip =
-            rip.stroke(ring([x, HZ + 2.0], [rx, rx * 0.17], 90, 0.0, PI), 1.4 - j as f32 * 0.4, rgb(0xffe2b8).alpha(a));
+        rip = rip.stroke(
+            ring([x, f.hz + 2.0], [rx, rx * 0.17], 90, 0.0, PI),
+            1.4 - j as f32 * 0.4,
+            rgb(0xffe2b8).alpha(a),
+        );
     }
     rip
 }
 
-fn glitter(mut b: Shape, cx: f32, len: f32, width: f32, tone: Color, k: f32, t: f32) -> Shape {
+fn glitter(f: Frame, mut b: Shape, cx: f32, len: f32, width: f32, tone: Color, t: f32) -> Shape {
     const ROWS: u32 = 30;
     for r in 0..ROWS {
-        let f = r as f32 / ROWS as f32;
-        let y = HZ + 2.5 + f.powf(1.45) * len;
-        let half = 3.0 + width * f.powf(0.8);
+        let down = r as f32 / ROWS as f32;
+        let y = f.hz + 2.5 + down.powf(1.45) * len;
+        let half = 3.0 + width * down.powf(0.8);
         let pieces = 1 + (hash(r + 900) * 2.6) as u32;
         for j in 0..pieces {
             let id = r * 5 + j;
             let ph = t * (0.8 + hash(id) * 0.9) + hash(id + 3) * TAU;
             let at = cx + ((hash(id + 7) - 0.5) * 2.0 + ph.sin() * 0.35) * half;
             let l = half * (0.25 + 0.45 * (0.5 + 0.5 * (ph * 1.3).cos())) / pieces as f32 * 1.6;
-            let a = k * (0.95 - 0.6 * f) * (0.55 + 0.45 * (ph * 0.7).sin()) * calm(at, y);
-            b = b.line([at - l, y], [at + l, y], 0.9 + 1.5 * f, LineCap::Round, tone.alpha(a));
+            let a = tone.a * (0.95 - 0.6 * down) * (0.55 + 0.45 * (ph * 0.7).sin()) * calm(f, at, y);
+            b = b.line([at - l, y], [at + l, y], 0.9 + 1.5 * down, LineCap::Round, tone.alpha(a));
         }
     }
     b
@@ -698,19 +712,19 @@ fn glitter(mut b: Shape, cx: f32, len: f32, width: f32, tone: Color, k: f32, t: 
 
 /// Where the i-th lantern of a cycle floats, and how large it is there (nearer is larger).
 /// All four keep out of the readout's corner and clear of the controls.
-fn sea_spot(i: usize) -> ([f32; 2], f32) {
+fn sea_spot(f: Frame, i: usize) -> ([f32; 2], f32) {
     const SPOTS: [[f32; 2]; 4] = [[0.80, 0.08], [0.93, 0.32], [0.50, 0.0], [0.72, 0.56]];
     let [fx, fy] = SPOTS[i];
-    ([W * fx, HZ + 14.0 + fy * (H - HZ - 40.0)], 0.8 + 0.6 * fy)
+    ([f.w * fx, f.hz + 14.0 + fy * (f.h - f.hz - 40.0)], 0.8 + 0.6 * fy)
 }
 
 /// Where today's i-th lantern-star sits: each cycle's four make a small kite of their own,
 /// the cycles spread high across the sky, clear of the moon's path.
-fn star_at(i: usize) -> [f32; 2] {
+fn star_at(f: Frame, i: usize) -> [f32; 2] {
     const KITE: [[f32; 2]; 4] = [[-26.0, 10.0], [-8.0, -12.0], [17.0, -4.0], [30.0, 16.0]];
     let c = (i / 4) as u32;
     let centre = [
-        W * (0.22 + 0.3 * (c % 2) as f32) + 14.0 * (hash(c + 900) - 0.5),
+        f.w * (0.22 + 0.3 * (c % 2) as f32) + 14.0 * (hash(c + 900) - 0.5),
         66.0 + 46.0 * ((c / 2) % 2) as f32 + 10.0 * hash(c + 901),
     ];
     let [dx, dy] = KITE[i % 4];

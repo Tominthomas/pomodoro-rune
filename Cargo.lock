@@ -2344,7 +2344,7 @@ name = "pomodoro-rune"
 version = "0.1.0"
 dependencies = [
  "rune",
- "rune-notify",
+ "rune-mac",
  "serde",
  "serde_json",
 ]
@@ -2632,6 +2632,15 @@ dependencies = [
  "xkbcommon",
  "zbus 6.2.1",
  "zeroize",
+]
+
+[[package]]
+name = "rune-mac"
+version = "0.0.1"
+source = "git+https://github.com/anomalyco/rune?rev=bb310fc9e2c4a1a1937814c71efc08924a5c2885#bb310fc9e2c4a1a1937814c71efc08924a5c2885"
+dependencies = [
+ "objc2 0.5.3",
+ "rune-notify",
 ]
 
 [[package]]

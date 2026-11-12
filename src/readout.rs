@@ -7,7 +7,7 @@ use rune::tok::TextStyle;
 use rune::{El, Key, KeyEvent, LiveRegion, Transition, Tx, col, el, row, text, text_input};
 
 use crate::log::{self, Felt};
-use crate::theme::{H, Ink, W};
+use crate::theme::{Frame, Ink};
 use crate::timer::{CYCLE, Clock, Event, Phase, Timer};
 use crate::{Asking, State, carry, edit_label, finish_label, guarded, rate};
 
@@ -19,8 +19,8 @@ pub const QUIET: f32 = 0.86;
 pub const DISPLAY: f32 = 30.0;
 pub const LEAD: f32 = 13.0;
 pub const SMALL: f32 = 11.5;
-/// Where the readout's first line sits.
-const TOP: f32 = H - 184.0;
+/// How far above the window's bottom the readout's first line sits.
+const TOP: f32 = 184.0;
 /// How wide a label may run before it's cut with an ellipsis.
 const LABEL_W: f32 = 230.0;
 /// The smallest a target is under the pointer, whatever it draws.
@@ -56,10 +56,10 @@ pub fn pill(k: Ink, label: &str) -> El {
 
 /// The soft shade the readout sits on, darkest at the window's corner. Dark ink already reads
 /// on pale water, so its light shade stays faint: enough to quiet the texture, never a fog.
-pub fn scrim(k: Ink) -> El {
+pub fn scrim(k: Ink, f: Frame) -> El {
     let shade = k.shade;
     let a = if k == Ink::dark() { 0.4 } else { 1.0 };
-    el().key("scrim").absolute(0.0, H - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
+    el().key("scrim").absolute(0.0, f.h - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
         [0.05, 0.85],
         [340.0, 225.0],
         [
@@ -159,12 +159,12 @@ pub fn status(s: &State, k: Ink, news: bool) -> Option<El> {
     )
 }
 
-pub fn view(s: &State, k: Ink) -> El {
+pub fn view(s: &State, k: Ink, f: Frame) -> El {
     let t = &s.timer;
     let resting = t.phase != Phase::Focus;
     // Anchored at its top, so the time holds still whatever is offered under it. The top line
     // and the phase line keep one key each, so a change replaces the words in place.
-    let mut out = col().key("readout").absolute(24.0, TOP).w(W - 48.0).gap(3.0).items_start();
+    let mut out = col().key("readout").absolute(24.0, f.h - TOP).w(f.w - 48.0).gap(3.0).items_start();
     if resting {
         // During a break the top line is about the block just done, not the next one. It keeps
         // the label's shape, so the words change in place and never cross-fade over each other.
