@@ -47,7 +47,7 @@ fn the_click_that_brings_the_window_forward_starts_nothing() {
     app.wait(1.0);
     assert_eq!(
         (app.time(), app.phase()),
-        ("25:00".into(), "The sun sets as you focus. A finished block lights a lantern.".into())
+        ("25:00".into(), "The sun sets as you focus.\nA finished block lights a lantern.".into())
     );
     app.tap("sky");
     app.wait(1.0);
@@ -67,7 +67,7 @@ fn the_activating_click_on_a_control_does_nothing_either() {
     app.rt.update(|s, tx| on_focus(s, true, tx));
     app.tap("control-play");
     app.wait(1.0);
-    assert_eq!(app.phase(), "The sun sets as you focus. A finished block lights a lantern.");
+    assert_eq!(app.phase(), "The sun sets as you focus.\nA finished block lights a lantern.");
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");

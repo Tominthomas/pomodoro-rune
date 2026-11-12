@@ -63,6 +63,14 @@ pub fn pill(k: Ink, label: &str) -> El {
 pub fn scrim(k: Ink, f: Frame) -> El {
     let shade = k.shade;
     let a = if k == Ink::dark() { 0.4 } else { 1.0 };
+    if controls::two_rows(f) {
+        // Narrow, the readout rises into the sky, so the shade rises with it, across the window.
+        let reach = top(f) + 60.0;
+        return el().key("scrim").absolute(0.0, f.h - reach).size(f.w, reach).a11y_hidden().linear_gradient(
+            std::f32::consts::PI,
+            [(0.0, shade.alpha(0.0)), (0.14, shade.alpha(0.66 * a)), (1.0, shade.alpha(0.74 * a))],
+        );
+    }
     el().key("scrim").absolute(0.0, f.h - 280.0).size(350.0, 280.0).a11y_hidden().radial_gradient(
         [0.05, 0.85],
         [340.0, 225.0],

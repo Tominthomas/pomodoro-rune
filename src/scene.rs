@@ -11,7 +11,7 @@ use rune::{Color, El, Pixels, canvas, el};
 
 use crate::drawing::{disc, halo, hash, ring};
 use crate::lantern::{self, Lantern, Pose};
-use crate::theme::{Frame, Pal, Place, Water, rgb};
+use crate::theme::{Frame, H, Pal, Place, W, Water, rgb};
 use crate::timer::{Clock, Phase, RING, Timer};
 
 /// The sun is the progress, so it is drawn large enough to hold the eye.
@@ -28,6 +28,12 @@ const SINK: f32 = 2.6;
 /// The readout's corner of the water, kept calm: no lanterns, and little texture. It reaches
 /// this far from the left, and this far up from the bottom.
 const CALM: [f32; 2] = [250.0, 152.0];
+
+/// How far the sea runs below the horizon at the first size.
+const DEPTH: f32 = {
+    let f = Frame::of(W, H);
+    f.h - f.hz
+};
 
 /// Where the evening is. Derived each frame from the timer, never stored.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -374,7 +380,10 @@ fn water(s: &Scene<'_>, p: &Pal, sun: [f32; 2], sun_p: f32, sun_vis: f32, glow_k
     let t = s.drift;
     let depth = f.h - f.hz;
     let kind = s.place.water;
-    let stops = sea(kind, p);
+    // The water keeps its colours at the distances from the window's bottom they have at the first
+    // size, where the readout's ink is chosen against them; a deeper sea stretches the horizon's.
+    let stops =
+        sea(kind, p).map(|(at, c)| (if at == 0.0 { 0.0 } else { (1.0 - (1.0 - at) * DEPTH / depth).max(0.01) }, c));
     let (refl_x, refl) = match moon {
         Some(k) => (0.74, rgb(0xb8c2ea).alpha(0.22 * k)),
         None => (sun[0] / f.w, p.glow.alpha(0.45 * glow_k)),
