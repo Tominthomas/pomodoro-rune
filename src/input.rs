@@ -56,10 +56,11 @@ pub fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
         tx.focus("control-play", true);
         return true;
     }
+    let on_sky = matches!(s.page, Page::Scene) && !s.keys_open && !s.editing;
     let event = match &e.key {
         Key::Text(t) if t == " " => Event::Press { now },
-        Key::Up | Key::Right => Event::Nudge { minutes: 1 },
-        Key::Down | Key::Left => Event::Nudge { minutes: -1 },
+        Key::Up | Key::Right if on_sky => Event::Nudge { minutes: 1 },
+        Key::Down | Key::Left if on_sky => Event::Nudge { minutes: -1 },
         Key::Text(t) => match t.to_ascii_lowercase().as_str() {
             "s" => Event::Skip { now },
             "u" => Event::Undo { now },

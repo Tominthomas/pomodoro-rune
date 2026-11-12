@@ -82,8 +82,8 @@ pub fn view(key: String, label: String, look: &Lantern, pose: Pose) -> El {
         el().absolute(0.0, 0.0)
             .size(size, size)
             .offset(bob[0], bob[1])
-            .child(canvas(soft).absolute(0.0, 0.0).size(size, size).blur(pose.soft).cache())
-            .child(canvas(crisp).absolute(0.0, 0.0).size(size, size)),
+            .child(canvas(soft).absolute(0.0, 0.0).size(size, size).blur(pose.soft).cache().a11y_hidden())
+            .child(canvas(crisp).absolute(0.0, 0.0).size(size, size).a11y_hidden()),
     )
 }
 

@@ -14,6 +14,9 @@ use crate::today::{DAYS, Ledger, MONTHS, label, nav};
 use crate::{State, guarded};
 
 const GAP: f32 = 5.0;
+/// Narrower than this, a hovered day's summary doesn't fit beside "Four weeks" and its dates, so
+/// it goes under them, hovered or not, and the grid doesn't jump as the pointer moves.
+const BESIDE: f32 = 320.0;
 /// A day's sunset fills the width, seven to a week.
 /// A day's tile across a week of `wide` points, and its height.
 fn tile(wide: f32) -> (f32, f32) {
@@ -77,21 +80,19 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         .child(label(k, "less", 10.5, 450.0, 0.9))
         .child(samples)
         .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.9));
+    let heading = row()
+        .gap(8.0)
+        .center_y()
+        .child(label(k, "Four weeks", 12.0, 520.0, 0.92))
+        .child(label(k, &span(&days), 10.5, 450.0, 0.8).key("history-span"));
+    let aside = text(aside).key("evenings").font(TextStyle::new(11.0, 480.0)).color(k.text.alpha(0.9));
+    let top = if l.wide < BESIDE {
+        col().gap(4.0).child(heading).child(aside)
+    } else {
+        row().w(l.wide).justify_between().center_y().child(heading).child(aside)
+    };
     col()
-        .child(
-            row()
-                .w(l.wide)
-                .justify_between()
-                .center_y()
-                .child(
-                    row()
-                        .gap(8.0)
-                        .center_y()
-                        .child(label(k, "Four weeks", 12.0, 520.0, 0.92))
-                        .child(label(k, &span(&days), 10.5, 450.0, 0.8).key("history-span")),
-                )
-                .child(text(aside).key("evenings").font(TextStyle::new(11.0, 480.0)).color(k.text.alpha(0.9))),
-        )
+        .child(top)
         .child(el().h(6.0))
         .child(col().key("history").gap(GAP).child(head).child(weeks))
         .child(el().h(8.0))
@@ -129,8 +130,8 @@ fn sunset(l: &Ledger<'_>, step: usize, lit: u32, (w, h): (f32, f32)) -> El {
                 (1.0, dusk(p.sea_lo)),
             ],
         )
-        .child(canvas(sky).absolute(0.0, 0.0).size(w, shore).blur(1.2))
-        .child(canvas(sea).absolute(0.0, 0.0).size(w, h))
+        .child(canvas(sky).absolute(0.0, 0.0).size(w, shore).blur(1.2).a11y_hidden())
+        .child(canvas(sea).absolute(0.0, 0.0).size(w, h).a11y_hidden())
 }
 
 /// A day: its date, quiet over its sunset. A past day with no focus is still water under a pale
@@ -169,7 +170,7 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
             rune::shape::LineCap::Round,
             k.text.alpha(0.2),
         );
-        el().size(tw, th).radius(6.0).fill(k.text.alpha(0.07)).child(canvas(still).size(tw, th))
+        el().size(tw, th).radius(6.0).fill(k.text.alpha(0.07)).child(canvas(still).size(tw, th).a11y_hidden())
     } else {
         sunset(l, step(t.focused), t.lanterns, tile(l.wide))
     };

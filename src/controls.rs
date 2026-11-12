@@ -294,7 +294,7 @@ pub fn keys(status: Option<El>, f: Frame) -> El {
         .w(wide)
         .padding(20.0)
         .radius(16.0)
-        .fill(rgb(0x0d1128).alpha(0.95))
+        .fill(rgb(0x0d1128))
         .gap(14.0)
         .role("dialog")
         .label("Keys")

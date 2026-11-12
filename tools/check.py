@@ -36,6 +36,7 @@ FPS = {
     "busy-day": "30",
     "today-label": "60",
     "menus": "30",
+    "history-larger-small": "60",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
 SCENE = {
@@ -45,6 +46,7 @@ SCENE = {
     "four-labels": "today",
     "busy-day": "busy",
     "today-label": "today",
+    "history-larger-small": "today",
 }
 # Scripts rendered in a window of another size than the first, 380 x 540.
 SIZE = {
@@ -52,6 +54,7 @@ SIZE = {
     "size-wide": "900x600",
     "size-larger": "475x675",
     "size-larger-small": "380x540",
+    "history-larger-small": "380x540",
 }
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
@@ -536,6 +539,12 @@ CHECKS = [
     ),
     ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
+    (
+        "the keys card hides the scene behind it, which the veil around it still shows",
+        "keys",
+        "open",
+        lambda t: alpha(t["keys"]["fill"]) == 1.0 and alpha(t["keys-veil"]["fill"]) < 1.0,
+    ),
     ("the Timer menu starts the block", "menus", "running", lambda t: label(t, "control-play") == "Pause"),
     ("skips it", "menus", "skipped", lambda t: phase(t) == "Skipped before a minute. No lantern." and "undo" in t),
     ("and takes the skip back", "menus", "undone", lambda t: phase(t) == "focus" and "undo" not in t),
@@ -634,7 +643,8 @@ def clear(t):
     return not overlapping(t["@all"]) and apart
 
 
-for script, size in SIZE.items():
+for script in ("size-tall", "size-wide", "size-larger", "size-larger-small"):
+    size = SIZE[script]
     CHECKS += [
         (
             f"at {size}{' with Larger Text' if 'larger' in script else ''}, the waiting block and its controls "
@@ -658,6 +668,25 @@ for script, size in SIZE.items():
             lambda t: scrolls_to(t, "history") and t["history"]["rect"][1] < t["@view"][1] - 40,
         ),
     ]
+CHECKS += [
+    (
+        "with Larger Text in the smallest window, a hovered day's summary fits under the four weeks' dates",
+        "history-larger-small",
+        "hover",
+        lambda t: text(t, "evenings") == "Tue 10 Nov · 1 h 15 min · 3 lanterns" and fits(t),
+    ),
+    (
+        "and a past day's name and both ways back fit",
+        "history-larger-small",
+        "past",
+        lambda t: (
+            text(t, "today-title") == "Wednesday"
+            and inside(t, "back-to-today")
+            and inside(t, "today-close")
+            and fits(t)
+        ),
+    ),
+]
 CHECKS.append(
     (
         "Larger Text grows the smallest window until the bigger words fit: 380 x 540 of its points",

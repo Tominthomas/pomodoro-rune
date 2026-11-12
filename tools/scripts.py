@@ -299,6 +299,15 @@ SCRIPTS = {
     "size-wide": sized(),
     "size-larger": sized(larger=True),
     "size-larger-small": sized(larger=True, small=True),
+    "history-larger-small": [
+        {"t": 0.1, "type": "key", "name": "=", "cmd": True},
+        {"t": 0.6, "type": "resize", "dw": -95, "dh": -135, "dur": 0.05},
+        {"t": 1.0, "type": "wheel", "x": 190.0, "y": 400.0, "dy": -2000},
+        {"t": 1.9, "type": "move", "x": 98.0, "y": 471.0},
+        mark(2.7, "hover"),
+        {"t": 2.8, "type": "tap", "key": f"day-{TODAY - 7}"},
+        mark(3.8, "past"),
+    ],
     # A label longer than the window has room for.
     "long-label": [*label(0.1, "Thermodynamics problem set, chapter seven, the long derivations"), mark(4.5, "end")],
 }

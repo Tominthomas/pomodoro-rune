@@ -57,6 +57,20 @@ fn the_arrows_set_the_length_only_while_the_block_waits() {
 }
 
 #[test]
+fn the_arrows_leave_the_length_alone_while_today_or_the_keys_are_open() {
+    let mut app = App::new();
+    for (open, arrows) in [("h", [Key::Down, Key::Left]), ("?", [Key::Up, Key::Right])] {
+        app.char(open);
+        for arrow in arrows {
+            app.key(arrow);
+        }
+        app.key(Key::Escape);
+        app.look();
+        assert_eq!(app.time(), "25:00", "the arrows on {open} set nothing");
+    }
+}
+
+#[test]
 fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
     let mut app = App::new();
     app.one_minute();
