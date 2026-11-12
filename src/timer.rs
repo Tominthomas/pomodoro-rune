@@ -97,25 +97,26 @@ pub enum Clock {
     /// A hand is setting the length. `secs` is continuous; it shows snapped to whole minutes.
     Scrubbing { secs: f64 },
     /// The phase is over and the next winds up at `until`. `kept` is false for a focus block
-    /// let go early, which doesn't count; `from` is how far through it was when it ended.
+    /// skipped, which doesn't count; `from` is how far through it was when it ended.
     Ringing { until: f64, kept: bool, from: f32 },
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Event {
-    /// A tap on the scene, or Space.
+    /// A tap on the scene, or Space: starts, pauses or resumes, and during a bell starts what
+    /// comes next.
     Press { now: f64 },
     /// The hand moved the length by `secs`. Grabs it first if needed. Only while wound.
     Scrub { secs: f64 },
-    /// The hand let go: the length is set, and the block waits for a press like any other.
+    /// The hand lifted: the length is set, and the block waits for a press like any other.
     Release,
     /// Arrow keys: whole minutes, while wound.
     Nudge { minutes: i32 },
-    /// Moves on. A focus block that has started is let go: it rings out without counting.
+    /// Moves on. A focus block that has started is skipped: it rings out without counting.
     Skip { now: f64 },
     /// The clock reached the deadline `Timer::due` asked for.
     Due { now: f64 },
-    /// Takes back the last let go, until the next phase starts.
+    /// Takes back the last skip, until the next phase starts.
     Undo { now: f64 },
 }
 
@@ -124,7 +125,9 @@ pub enum Event {
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
     Finished,
-    LetGo,
+    /// Ended early with Skip. Records from before the word changed say `let_go`.
+    #[serde(alias = "let_go")]
+    Skipped,
 }
 
 /// A focus block's record, as the timer knows it: no wall-clock time or label.
@@ -142,7 +145,7 @@ pub enum Effect {
     WakeAt(f64),
     /// A phase ran to the end (not skipped).
     Rang(Phase),
-    /// A focus block that had started is over, finished or let go.
+    /// A focus block that had started is over, finished or skipped.
     Ended(Ended),
     /// The user set a new length for a phase.
     Lengths(Lengths),
@@ -151,7 +154,7 @@ pub enum Effect {
         from: Phase,
         to: Phase,
     },
-    /// The block let go last is running again: its record should go.
+    /// The block skipped last is running again: its record should go.
     Unended,
 }
 
@@ -162,7 +165,7 @@ pub struct Timer {
     pub done: u8,
     pub lengths: Lengths,
     pub clock: Clock,
-    /// The block let go last, as it was, until the next phase starts.
+    /// The block skipped last, as it was, until the next phase starts.
     undo: Option<Clock>,
 }
 
@@ -178,7 +181,7 @@ impl Timer {
         Timer { phase, done: done.min(CYCLE), lengths, clock: Clock::Wound, undo: None }
     }
 
-    /// Whether the block let go last can still be taken back: until the next phase starts, so
+    /// Whether the block skipped last can still be taken back: until the next phase starts, so
     /// the offer lasts as long as it takes to notice, through the break and Today too.
     pub fn can_undo(&self) -> bool {
         self.undo.is_some()
@@ -232,7 +235,12 @@ impl Timer {
             return fx;
         }
         match (self.clock.clone(), event) {
-            (Clock::Ringing { kept, .. }, Event::Press { .. }) => self.advance_by(kept, &mut fx),
+            // The bell offers the next phase by name, so a press starts it rather than only cutting
+            // the bell short.
+            (Clock::Ringing { kept, .. }, Event::Press { now }) => {
+                self.advance_by(kept, &mut fx);
+                self.start(self.length(), now, &mut fx);
+            }
             (Clock::Ringing { until, kept, .. }, Event::Due { now }) if now >= until => self.advance_by(kept, &mut fx),
             (Clock::Ringing { .. }, _) => {}
 
@@ -276,7 +284,7 @@ impl Timer {
             }
 
             (Clock::Ticking { .. } | Clock::Paused { .. }, Event::Skip { now }) if self.phase == Phase::Focus => {
-                self.let_go(now, &mut fx);
+                self.skip_block(now, &mut fx);
             }
             (_, Event::Skip { .. }) => self.advance_by(false, &mut fx),
             _ => {}
@@ -300,7 +308,7 @@ impl Timer {
 
     /// Ends a focus block early. Its minutes are kept, but it doesn't count toward the cycle,
     /// and it rings out quietly before the break. A pause still in progress counts as paused.
-    fn let_go(&mut self, now: f64, fx: &mut Effects<Effect>) {
+    fn skip_block(&mut self, now: f64, fx: &mut Effects<Effect>) {
         let from = self.progress(now);
         let left = self.remaining(now).ceil() as u32;
         let before = std::mem::replace(&mut self.clock, Clock::Wound);
@@ -316,14 +324,14 @@ impl Timer {
             }
         };
         let focused = run.planned.saturating_sub(left);
-        fx.push(Effect::Ended(Ended::of(Outcome::LetGo, focused, run)));
+        fx.push(Effect::Ended(Ended::of(Outcome::Skipped, focused, run)));
         let until = now + RING;
         self.clock = Clock::Ringing { until, kept: false, from };
         self.undo = Some(before);
         fx.push(Effect::WakeAt(until));
     }
 
-    /// Puts the block let go last back as it was. A running block kept running all along, so
+    /// Puts the block skipped last back as it was. A running block kept running all along, so
     /// the seconds since count, and one taken back after its end rings at once; one that was
     /// paused is still paused.
     fn undo(&mut self, now: f64, fx: &mut Effects<Effect>) {
@@ -479,7 +487,7 @@ mod tests {
         fx.extend(run_to_end(&mut t, &mut now));
         assert_eq!(
             ended(&fx),
-            vec![Ended { outcome: Outcome::LetGo, planned: 1500, focused: 540, pauses: vec![], paused: 0 }]
+            vec![Ended { outcome: Outcome::Skipped, planned: 1500, focused: 540, pauses: vec![], paused: 0 }]
         );
         assert_eq!((t.phase, t.done), (Phase::Short, 2));
     }
@@ -491,11 +499,11 @@ mod tests {
         t.step(Event::Press { now: 60.0 });
         let fx: Vec<_> = t.step(Event::Skip { now: 660.0 }).into_iter().collect();
         let [block] = &ended(&fx)[..] else { panic!("{fx:?}") };
-        assert_eq!((block.outcome, block.focused, block.paused, block.pauses.len()), (Outcome::LetGo, 60, 600, 1));
+        assert_eq!((block.outcome, block.focused, block.paused, block.pauses.len()), (Outcome::Skipped, 60, 600, 1));
     }
 
     #[test]
-    fn a_block_let_go_can_be_taken_back_through_the_break_until_it_starts() {
+    fn a_skipped_block_can_be_taken_back_through_the_break_until_it_starts() {
         let mut t = Timer::default();
         let mut now = 0.0;
         t.step(Event::Press { now });
@@ -515,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn a_let_go_cant_be_taken_back_once_the_break_starts() {
+    fn a_skip_cant_be_taken_back_once_the_break_starts() {
         let mut t = Timer::default();
         t.step(Event::Press { now: 0.0 });
         t.step(Event::Skip { now: 200.0 });
@@ -577,13 +585,14 @@ mod tests {
     }
 
     #[test]
-    fn a_press_while_ringing_moves_on_without_waiting_for_the_bell() {
+    fn a_press_while_ringing_starts_the_break_without_waiting_for_the_bell() {
         let mut t = Timer::default();
         t.step(Event::Press { now: 0.0 });
         t.step(Event::Due { now: 1500.0 });
         assert!(matches!(t.clock, Clock::Ringing { .. }));
         t.step(Event::Press { now: 1500.3 });
         assert_eq!(t.phase, Phase::Short);
+        assert!(matches!(t.clock, Clock::Ticking { ends_at: 1800.3, .. }), "{:?}", t.clock);
     }
 
     #[test]
@@ -606,10 +615,10 @@ mod tests {
         t.step(Event::Press { now: 0.0 });
         t.step(Event::Due { now: 1500.0 });
         assert_eq!((t.phase, t.settled()), (Phase::Focus, (Phase::Long, CYCLE)), "the fourth bell owes the long break");
-        let mut let_go = Timer { done: 3, ..Timer::default() };
-        let_go.step(Event::Press { now: 0.0 });
-        let_go.step(Event::Skip { now: 10.0 });
-        assert_eq!(let_go.settled(), (Phase::Short, 3));
+        let mut skipped = Timer { done: 3, ..Timer::default() };
+        skipped.step(Event::Press { now: 0.0 });
+        skipped.step(Event::Skip { now: 10.0 });
+        assert_eq!(skipped.settled(), (Phase::Short, 3));
     }
 
     #[test]
@@ -666,5 +675,11 @@ mod tests {
         t.step(Event::Press { now });
         fx.extend(t.step(Event::Skip { now: now + 10.0 }));
         assert!(ended(&fx).is_empty(), "{fx:?}");
+    }
+
+    #[test]
+    fn a_block_saved_as_let_go_before_the_rename_loads_as_skipped() {
+        let old: Outcome = serde_json::from_str("\"let_go\"").unwrap();
+        assert_eq!((old, serde_json::to_string(&old).unwrap()), (Outcome::Skipped, "\"skipped\"".into()));
     }
 }

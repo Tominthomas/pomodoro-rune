@@ -1,0 +1,66 @@
+{
+ "events": [
+  {
+   "t": 0.3,
+   "menu": "timer-press"
+  },
+  {
+   "t": 2.0,
+   "type": "mark",
+   "name": "running"
+  },
+  {
+   "t": 2.2,
+   "menu": "timer-skip"
+  },
+  {
+   "t": 2.6,
+   "type": "mark",
+   "name": "skipped"
+  },
+  {
+   "t": 2.8,
+   "menu": "timer-undo"
+  },
+  {
+   "t": 3.2,
+   "type": "mark",
+   "name": "undone"
+  },
+  {
+   "t": 3.4,
+   "menu": "view-today"
+  },
+  {
+   "t": 3.8,
+   "type": "mark",
+   "name": "today"
+  },
+  {
+   "t": 4.0,
+   "menu": "place-2"
+  },
+  {
+   "t": 4.2,
+   "menu": "view-today"
+  },
+  {
+   "t": 4.6,
+   "type": "mark",
+   "name": "mesa"
+  },
+  {
+   "t": 4.8,
+   "menu": "view-next-place"
+  },
+  {
+   "t": 5.0,
+   "menu": "help-keys"
+  },
+  {
+   "t": 5.4,
+   "type": "mark",
+   "name": "keys"
+  }
+ ]
+}

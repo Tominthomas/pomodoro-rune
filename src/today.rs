@@ -8,6 +8,7 @@ use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
 use rune::{El, Key, KeyEvent, ScrollSpec, TextEdit, Tx, canvas, col, el, row, text, text_input};
 
+use crate::controls;
 use crate::drawing::ring;
 use crate::history;
 use crate::lantern::{self, Lantern, Pose};
@@ -37,9 +38,6 @@ pub const MONTHS: [&str; 12] = [
     "November",
     "December",
 ];
-/// What the strip's marks mean, on each mark's tooltip.
-const LANTERN: &str = "a lantern is a block finished";
-const RING: &str = "a ring is the minutes kept after letting go";
 /// The strip's viewport, which a crowded day scrolls sideways.
 pub const STRIP: &str = "day-strip-view";
 
@@ -58,6 +56,10 @@ pub struct Ledger<'a> {
     pub rename: &'a TextEdit,
     /// What the last bell said, until the next phase starts.
     pub status: Option<El>,
+    /// Why the record isn't saved, until a save works.
+    pub unsaved: Option<El>,
+    /// Whether to say that a mark opens its block: until one has been opened.
+    pub cue: bool,
     /// The timer as it stands, and the window's clock to read it at.
     pub timer: &'a Timer,
     pub clock: f64,
@@ -167,29 +169,24 @@ impl Ledger<'_> {
 
 /// The timer as it stands, held at the top of Today so time passing, or a pause, is never out of
 /// sight: the phase and its time, the one press it takes now, and the bell's words until the next
-/// start. A let go can still be taken back from here.
+/// start. A skipped block can still be taken back from here.
 fn now_bar(l: &Ledger<'_>) -> El {
     let k = l.ink();
     let t = l.timer;
     let time = mmss(t.shown(l.clock));
-    let (words, press) = match (&t.clock, t.phase) {
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => {
-            (format!("Focus ready · {time}"), Some("Start focus"))
-        }
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => {
-            (format!("Break ready · {time}"), Some("Start break"))
-        }
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => {
-            (format!("Long break ready · {time}"), Some("Start break"))
-        }
-        (Clock::Ticking { .. }, Phase::Focus) => (format!("Focus · {time} left"), Some("Pause")),
-        (Clock::Ticking { .. }, Phase::Short) => (format!("Break · {time} left"), Some("Pause")),
-        (Clock::Ticking { .. }, Phase::Long) => (format!("Long break · {time} left"), Some("Pause")),
-        (Clock::Paused { .. }, _) => (format!("Paused · {time} left"), Some("Resume")),
-        (Clock::Ringing { kept: true, .. }, Phase::Focus) => ("Focus complete".into(), None),
-        (Clock::Ringing { .. }, Phase::Focus) => ("Let go".into(), None),
-        (Clock::Ringing { .. }, _) => ("Break over".into(), None),
+    let words = match (&t.clock, t.phase) {
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => format!("Focus ready · {time}"),
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => format!("Break ready · {time}"),
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => format!("Long break ready · {time}"),
+        (Clock::Ticking { .. }, Phase::Focus) => format!("Focus · {time} left"),
+        (Clock::Ticking { .. }, Phase::Short) => format!("Break · {time} left"),
+        (Clock::Ticking { .. }, Phase::Long) => format!("Long break · {time} left"),
+        (Clock::Paused { .. }, _) => format!("Paused · {time} left"),
+        (Clock::Ringing { kept: true, .. }, Phase::Focus) => "Focus complete".into(),
+        (Clock::Ringing { .. }, Phase::Focus) => "Skipped".into(),
+        (Clock::Ringing { .. }, _) => "Break over".into(),
     };
+    let press = controls::press_words(t);
     let mut said = col().gap(3.0).shrink().child(label(k, &words, 13.0, 560.0, 0.97).key("timer-text"));
     if let Some(status) = l.status.clone() {
         said = said.child(status.wrap());
@@ -197,16 +194,14 @@ fn now_bar(l: &Ledger<'_>) -> El {
     let mut acts = row().gap(6.0).self_start();
     if t.can_undo() {
         acts = acts.child(
-            button(k, "timer-undo", "Undo let go", "Bring the block back  U")
+            button(k, "timer-undo", "Undo skip", "Bring the block back  U")
                 .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx))),
         );
     }
-    if let Some(press) = press {
-        acts = acts.child(
-            button(k, "timer-press", press, &format!("{press}  Space"))
-                .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
-        );
-    }
+    acts = acts.child(
+        button(k, "timer-press", press, &format!("{press}  Space"))
+            .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
+    );
     row()
         .key("timer-bar")
         .w(WIDE)
@@ -256,13 +251,11 @@ pub fn view(l: &Ledger<'_>) -> El {
                 .child(label(k, &subtitle, 12.0, 450.0, 0.82).key("today-date")),
         )
         .child(actions.self_start());
-    let page = col()
-        .key("today")
-        .pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0))
-        .child(now_bar(l))
-        .child(el().h(14.0))
-        .child(head)
-        .child(el().h(6.0));
+    let mut page = col().key("today").pin(Some(PAD), Some(PAD - 6.0), Some(PAD - 4.0), Some(0.0)).child(now_bar(l));
+    if let Some(unsaved) = l.unsaved.clone() {
+        page = page.child(el().h(8.0)).child(unsaved.w(WIDE));
+    }
+    let page = page.child(el().h(14.0)).child(head).child(el().h(6.0));
     let mut body = col().key("today-body").pb(PAD);
     let opened = l.nav.serial().and_then(|n| blocks.iter().find(|(m, _)| *m == n)).map(|(n, b)| (*n, *b));
     let under = match opened {
@@ -271,6 +264,12 @@ pub fn view(l: &Ledger<'_>) -> El {
             label(k, "No blocks yet today. The sea is calm.", 11.5, 450.0, 0.82).key("strip-note")
         }
         None if blocks.is_empty() => label(k, "No blocks this day.", 11.5, 450.0, 0.82).key("strip-note"),
+        None if l.cue => col().gap(6.0).child(key_row(k)).child(
+            label(k, "Select a lantern or ring to open the block", 10.5, 460.0, 0.82)
+                .key("strip-cue")
+                .max_w(WIDE)
+                .wrap(),
+        ),
         None => key_row(k),
     };
     body = body.child(el().h(2.0)).child(strip(l, &blocks)).child(under).child(el().h(14.0));
@@ -280,8 +279,8 @@ pub fn view(l: &Ledger<'_>) -> El {
         &totals.lanterns.to_string(),
         if totals.lanterns == 1 { "lantern lit" } else { "lanterns lit" },
     ));
-    if totals.let_go() > 0 {
-        numbers = numbers.child(stat(k, "let-go", &totals.let_go().to_string(), "let go"));
+    if totals.skipped() > 0 {
+        numbers = numbers.child(stat(k, "skipped", &totals.skipped().to_string(), "skipped"));
     }
     body = body.child(numbers);
     let labels = Log::labels(blocks.iter().map(|(_, b)| *b));
@@ -326,7 +325,7 @@ fn key_row(k: Ink) -> El {
         LineCap::Round,
         ink,
     );
-    let let_go = Shape::new().stroke(ring([7.0, 7.0], [6.0, 2.0], 24, 0.0, std::f32::consts::TAU), 1.3, ink);
+    let skipped = Shape::new().stroke(ring([7.0, 7.0], [6.0, 2.0], 24, 0.0, std::f32::consts::TAU), 1.3, ink);
     let knot = Shape::new()
         .line([7.0, 0.5], [7.0, 11.5], 1.0, LineCap::Round, ink)
         .fill(ring([7.0, 6.0], [1.9, 1.9], 10, 0.0, std::f32::consts::TAU), ink);
@@ -336,7 +335,7 @@ fn key_row(k: Ink) -> El {
         .gap(14.0)
         .center_y()
         .child(mark("key-lantern", lit, "a block finished"))
-        .child(mark("key-ring", let_go, "let go, minutes kept"))
+        .child(mark("key-ring", skipped, "skipped, minutes kept"))
         .child(mark("key-knot", knot, "a pause"))
 }
 
@@ -350,14 +349,14 @@ fn pauses(n: usize) -> String {
     }
 }
 
-/// When a block ran and for how long: "10:40 – 11:05 · 25 min", or "· let go, 9 min kept".
+/// When a block ran and for how long: "10:40 – 11:05 · 25 min", or "· skipped, 9 min kept".
 fn when(cal: Calendar, b: &Block) -> String {
     let (from, to) = (cal.local(b.started()), cal.local(b.ended));
     let span = format!("{}:{:02} – {}:{:02}", from.hour, from.minute, to.hour, to.minute);
     if b.finished() {
         format!("{span} · {}", duration(b.focused))
     } else {
-        format!("{span} · let go, {} kept", duration(b.focused))
+        format!("{span} · skipped, {} kept", duration(b.focused))
     }
 }
 
@@ -427,6 +426,7 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
     let name = if l.nav.open.is_some_and(|d| d.renaming) {
         text_input(l.rename, TextStyle::new(11.5, 480.0))
             .key("detail-label-field")
+            .label("Name for this block")
             .single_line()
             .w(150.0)
             .color(k.text.alpha(0.97))
@@ -471,7 +471,7 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
 }
 
 /// The day along a waterline, with each block where it ended: a lantern for one that ran to
-/// the bell, a ring for one let go. Blocks that ended close together are spread apart, and a day
+/// the bell, a ring for one skipped. Blocks that ended close together are spread apart, and a day
 /// with more than the window holds runs on to the right, scrolled to its newest when Today
 /// opens. On today, a labelled tick marks now.
 fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
@@ -517,8 +517,10 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
         let x = x.round();
         let spoken = format!("{}, {}", when(l.cal, b), about(b).join(", "));
         let picked = l.nav.serial() == Some(serial);
-        // Every mark takes a press over at least `HIT` square, and lights under the pointer.
-        let target = |key: String, y: f32, meaning: &str| {
+        // Every mark takes a press over at least `HIT` square, lights under the pointer, and says
+        // that it opens its block, or closes it once open.
+        let verb = if picked { "Close block" } else { "Open block" };
+        let target = |key: String, y: f32| {
             el().key(key)
                 .absolute(x - HIT / 2.0, y - HIT / 2.0)
                 .size(HIT, HIT)
@@ -526,18 +528,23 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
                 .hover(k.text.alpha(0.16))
                 .fill(k.text.alpha(if picked { 0.16 } else { 0.0 }))
                 .role("button")
-                .label(spoken.clone())
-                .help(format!("{}: {meaning}", when(l.cal, b)))
+                .label(format!("{verb}: {spoken}"))
+                .help(format!("{verb}: {}", when(l.cal, b)))
                 .focusable(true)
                 .focus_ring(1.5, 0.0, k.text.alpha(0.9))
-                .on_press_tx(navigate(move |n| n.toggle(serial)))
+                .on_press_tx(guarded(move |s, _| {
+                    if let Some(n) = nav(s) {
+                        n.toggle(serial);
+                    }
+                    s.learned_marks();
+                }))
         };
         if b.finished() {
             let pose = Pose { scale: 1.15, t: 0.0, seed: 0, bloom: 1.0, glow: 0.4, reflect: true, soft: 4.0 };
             let half = pose.reach() / 2.0;
             let y = base - 14.0 - (lit % 2) as f32 * 7.0;
             // The glow reaches far; only the target around the lantern takes the press.
-            art = art.child(target(format!("day-lantern-{lit}"), y, LANTERN)).child(
+            art = art.child(target(format!("day-lantern-{lit}"), y)).child(
                 lantern::view(format!("day-lantern-art-{lit}"), String::new(), &Lantern::of(b), pose)
                     .absolute(x - half, y - half)
                     .inert()
@@ -550,7 +557,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
                 1.4,
                 k.text.alpha(if picked { 0.95 } else { 0.75 }),
             );
-            art = art.child(target(format!("day-ring-{rings}"), base - 2.0, RING));
+            art = art.child(target(format!("day-ring-{rings}"), base - 2.0));
             rings += 1;
         }
     }
@@ -606,7 +613,7 @@ fn worked_on(l: &Ledger<'_>, labels: &[(&str, u32)], total: u32) -> El {
                                 .max_w(WIDE - 80.0)
                                 .truncate(),
                         )
-                        .child(label(k, &time, 11.5, 450.0, 0.82)),
+                        .child(label(k, &time, 11.5, 480.0, 0.95)),
                 )
                 .child(
                     el().w(WIDE)

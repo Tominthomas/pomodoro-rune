@@ -9,6 +9,7 @@ mod drawing;
 mod history;
 mod lantern;
 mod log;
+mod menu;
 mod readout;
 mod scene;
 mod store;
@@ -17,7 +18,7 @@ mod theme;
 mod timer;
 mod today;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
 use rune::prefs::Prefs;
@@ -111,6 +112,8 @@ pub struct State {
     reflect: Option<Reflect>,
     /// The first-use hint for setting a block's length, until it's been used or put away.
     hint: bool,
+    /// Today's cue that a mark opens its block, until one has been opened.
+    cue_marks: bool,
     page: Page,
     /// The key overlay `?` opens.
     keys_open: bool,
@@ -130,8 +133,9 @@ pub struct State {
     /// Whether the window is the key window, and when it last became it.
     key_window: bool,
     activated_at: f64,
-    /// The press under way on the sky brought the window forward, so it does nothing else.
-    activating: bool,
+    /// The press under way on the sky did its one job as it went down, bringing the window
+    /// forward or putting the name field away, so it does nothing else.
+    spent: bool,
     visible: bool,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
     /// block's morning comes up from there.
@@ -147,6 +151,9 @@ pub struct State {
     /// announced once, as it happens, never again when the page or the key card changes.
     bells: u32,
     heard: Cell<u32>,
+    /// The menu bar, and the items it was last given. A test has none.
+    menu_bar: Option<AppHandle<State>>,
+    menu_shown: RefCell<Vec<menu::Item>>,
 }
 
 /// The first state, from what was saved. Headless runs keep their own settings and record in
@@ -160,13 +167,16 @@ fn init(handle: AppHandle<State>) -> State {
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
     };
     let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
-    restore(prefs, epoch, cal, |prefs| {
+    let menu_bar = handle.clone();
+    let mut s = restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()
         } else {
             Store::open(prefs, move |e| handle.update(move |s: &mut State, _| s.save_error = e))
         }
-    })
+    });
+    s.menu_bar = Some(menu_bar);
+    s
 }
 
 /// A window's state from what `prefs` holds, as of Unix `epoch`; `open` turns the prefs into the
@@ -179,12 +189,13 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let lengths: Lengths = prefs.get("lengths").unwrap_or_default();
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
+    let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.place) = (hint, place);
+    (s.hint, s.cue_marks, s.place) = (hint, cue_marks, place);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -210,6 +221,7 @@ impl State {
             rename: TextEdit::new(String::new()),
             reflect: None,
             hint: false,
+            cue_marks: false,
             page: Page::Scene,
             keys_open: false,
             place: 0,
@@ -221,7 +233,7 @@ impl State {
             drawn: Cell::new(None),
             key_window: true,
             activated_at: f64::NEG_INFINITY,
-            activating: false,
+            spent: false,
             visible: true,
             dawn_from: None,
             reduced: Cell::new(false),
@@ -230,6 +242,8 @@ impl State {
             rang: None,
             bells: 0,
             heard: Cell::new(0),
+            menu_bar: None,
+            menu_shown: RefCell::new(Vec::new()),
         }
     }
 
@@ -337,6 +351,14 @@ impl State {
         self.store.set(study::KEY, self.study.clone());
     }
 
+    /// A block was opened from Today, so its marks no longer need the cue.
+    fn learned_marks(&mut self) {
+        if self.cue_marks {
+            self.cue_marks = false;
+            self.store.set("opened-block", true);
+        }
+    }
+
     fn put_hint_away(&mut self) {
         if self.hint {
             self.hint = false;
@@ -437,6 +459,8 @@ fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
         changed = true;
     }
     tx.wake_at(s.next_change());
+    // A bell can ring with the window hidden, where no view runs; the menu still follows it.
+    menu::sync(s);
     if let Some(fps) = s.motion() {
         if now >= s.next_frame {
             s.drift += (1.0 / fps) as f32;
@@ -473,9 +497,15 @@ fn set_place(s: &mut State, index: usize, tx: &mut Tx) {
     s.store.set("place", Place::at(s.place).name);
 }
 
+/// Opens the field for the next block's name. It lives under the time on the sunset, so Today
+/// and the key card close first: a field that isn't drawn can't take the keys.
 fn edit_label(s: &mut State, tx: &mut Tx) {
+    s.keys_open = false;
+    open_today(s, false, tx);
     s.editing = true;
     s.label.focused = true;
+    // The name it has is selected, so typing replaces it and an arrow keeps it.
+    s.label.set_selection(0, s.label.text.len());
     tx.focus("label-field", false);
 }
 
@@ -499,7 +529,9 @@ fn open_today(s: &mut State, open: bool, tx: &mut Tx) {
 
 /// Escape closes whatever is open, innermost first.
 fn escape(s: &mut State, tx: &mut Tx) -> bool {
-    if s.keys_open {
+    if s.editing {
+        finish_label(s, false, tx);
+    } else if s.keys_open {
         s.keys_open = false;
     } else if let Page::Today(nav) = &mut s.page {
         if !nav.escape() {
@@ -522,6 +554,14 @@ fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
     }
     if e.is_command('z') {
         carry(s, Event::Undo { now }, tx);
+        return true;
+    }
+    if let (true, Key::Text(t)) = (s.editing, &e.key) {
+        // A name is being typed, so letters are words, never shortcuts. Only a field that lost
+        // focus lets one reach here: it takes the letter and focus back.
+        s.label.insert(t);
+        s.label.focused = true;
+        tx.focus("label-field", false);
         return true;
     }
     if e.key == Key::Tab && tx.focused().is_none() && matches!(s.page, Page::Scene) && !s.keyboard {
@@ -573,11 +613,16 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
     match d.phase {
         DragPhase::Down => {
             d.data = d.y;
-            s.activating = s.activating_press(tx);
+            s.spent = s.activating_press(tx);
+            if s.editing {
+                // A click on the sky while naming keeps the name.
+                finish_label(s, true, tx);
+                s.spent = true;
+            }
         }
         DragPhase::Move => {
             let scrubbing = matches!(s.timer.clock, Clock::Scrubbing { .. });
-            if !scrubbing && (s.activating || d.dx.hypot(d.dy) < SLOP || s.timer.clock != Clock::Wound) {
+            if !scrubbing && (s.spent || d.dx.hypot(d.dy) < SLOP || s.timer.clock != Clock::Wound) {
                 return;
             }
             let from = match s.timer.clock {
@@ -589,7 +634,7 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
             carry(s, Event::Scrub { secs: to - from }, tx);
         }
         DragPhase::Up if matches!(s.timer.clock, Clock::Scrubbing { .. }) => carry(s, Event::Release, tx),
-        DragPhase::Up if !s.activating && !d.cancelled() && d.dx.hypot(d.dy) < SLOP => {
+        DragPhase::Up if !s.spent && !d.cancelled() && d.dx.hypot(d.dy) < SLOP => {
             carry(s, Event::Press { now }, tx);
         }
         DragPhase::Up => {}
@@ -599,6 +644,7 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
+    menu::sync(s);
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     let (water, stars) = s.lanterns();
@@ -652,6 +698,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
+            let ink = if dark { theme::Ink::light() } else { theme::Ink::dark() };
             let ledger = today::Ledger {
                 log: &s.study.log,
                 cal: s.cal,
@@ -661,8 +708,9 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 dark,
                 nav,
                 rename: &s.rename,
-                status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
-                    .filter(|_| !s.keys_open),
+                status: readout::status(s, ink, news).filter(|_| !s.keys_open),
+                unsaved: readout::save_status(s, ink),
+                cue: s.cue_marks,
                 timer: &s.timer,
                 clock: s.now,
             };

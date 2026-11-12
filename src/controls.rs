@@ -1,4 +1,4 @@
-//! The controls, bottom right: start or pause, let go (or skip a break), Today, the place and
+//! The controls, bottom right: start or pause, skip, Today, the place and
 //! the keys. While a block or a break waits they stay out, each saying what it does, with
 //! "Start focus" first. Once it runs they recede: they come out while the pointer moves or after
 //! Tab, and stay while the pointer rests on their corner. Hidden, only their look goes: they take
@@ -11,11 +11,12 @@ use rune::{El, PopupMenu, Tx, canvas, col, el, row, text};
 
 use crate::readout::{BRIGHT, QUIET, SMALL, button, line};
 use crate::theme::{Ink, PLACES, Place, rgb};
-use crate::timer::{Clock, Event, Phase};
+use crate::timer::{Clock, Event, Phase, Timer};
 use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
 
-/// The corner the controls live in, measured from the window's bottom right.
-const DOCK: (f32, f32) = (330.0, 56.0);
+/// How far the controls sit in from the window's bottom right; their corner reaches that far
+/// around them.
+const MARGIN: f32 = 14.0;
 /// How tall the dock's quieter controls stand.
 const TALL: f32 = 28.0;
 
@@ -59,68 +60,73 @@ fn tab(k: Ink, words: &str) -> El {
         .child(line(k, words, SMALL, 540.0, BRIGHT))
 }
 
-/// The waiting block's way in: what pressing it starts, in words, drawn in the ink itself.
-fn primary(k: Ink, words: &str) -> El {
+/// How wide the primary control stands in every state, so Start, Pause and Resume share one
+/// target and no other control ever moves into the place a press just landed.
+const PRIMARY_W: f32 = 116.0;
+
+/// What the primary control does now, in its own words. The dock, Today and the menu all say it.
+pub fn press_words(t: &Timer) -> &'static str {
+    match (&t.clock, t.settled().0) {
+        (Clock::Ticking { .. }, _) => "Pause",
+        (Clock::Paused { .. }, _) => "Resume",
+        (_, Phase::Focus) => "Start focus",
+        _ => "Start break",
+    }
+}
+
+/// What Skip does now, as its name and as the consequence its tooltip gives first, while there
+/// is a block or a break to skip. The dock and the menu both offer it.
+pub fn skip_words(t: &Timer) -> Option<(&'static str, &'static str)> {
+    match (t.phase, &t.clock) {
+        (_, Clock::Ringing { .. }) | (Phase::Focus, Clock::Wound | Clock::Scrubbing { .. }) => None,
+        (Phase::Focus, _) => Some(("Skip this block", "End this block now: its minutes count, no lantern")),
+        _ => Some(("Skip break", "Skip the rest of this break")),
+    }
+}
+
+/// The primary control's look: what pressing it does, in words beside its glyph, drawn in the ink
+/// itself.
+fn primary(k: Ink, t: &Timer) -> El {
     let on = Ink { text: k.shade, shade: k.text };
-    let triangle = Shape::new().fill(vec![[1.0, 0.5], [9.0, 5.5], [1.0, 10.5]], on.text);
+    let glyph = if matches!(t.clock, Clock::Ticking { .. }) {
+        Shape::new().line([2.5, 1.5], [2.5, 9.5], 2.2, LineCap::Round, on.text).line(
+            [7.5, 1.5],
+            [7.5, 9.5],
+            2.2,
+            LineCap::Round,
+            on.text,
+        )
+    } else {
+        Shape::new().fill(vec![[1.0, 0.5], [9.0, 5.5], [1.0, 10.5]], on.text)
+    };
     row()
+        .w(PRIMARY_W)
         .h(34.0)
-        .pl(13.0)
-        .pr(15.0)
         .gap(7.0)
-        .center_y()
+        .center()
         .radius(17.0)
         .fill(k.text.alpha(0.92))
         .hover(k.shade.alpha(0.12))
-        .child(canvas(triangle).size(10.0, 11.0))
-        .child(line(on, words, 12.0, 600.0, 1.0))
+        .child(canvas(glyph).size(10.0, 11.0))
+        .child(line(on, press_words(t), 12.0, 600.0, 1.0))
 }
 
 pub fn view(s: &State, k: Ink) -> El {
     let shown = s.controls_shown();
     let t = &s.timer;
     let press = act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx));
-    let play = if matches!(t.clock, Clock::Wound | Clock::Scrubbing { .. }) {
-        let words = if t.phase == Phase::Focus { "Start focus" } else { "Start break" };
-        docked(k, "control-play", words, "Space", 17.0, shown, primary(k, words))
-    } else {
-        // Running, the primary control is a glyph, small enough to recede with the rest.
-        let on = k.shade;
-        let (glyph, label) = match t.clock {
-            Clock::Ticking { .. } => (
-                Shape::new().line([5.0, 3.0], [5.0, 13.0], 2.4, LineCap::Round, on).line(
-                    [11.0, 3.0],
-                    [11.0, 13.0],
-                    2.4,
-                    LineCap::Round,
-                    on,
-                ),
-                "Pause",
-            ),
-            Clock::Paused { .. } => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Resume"),
-            _ => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Start"),
-        };
-        let look = el()
-            .size(38.0, 38.0)
-            .radius(19.0)
-            .center()
-            .fill(k.text.alpha(0.92))
-            .hover(k.shade.alpha(0.12))
-            .child(canvas(glyph).size(16.0, 16.0));
-        docked(k, "control-play", label, "Space", 19.0, shown, look)
-    };
+    let play = docked(k, "control-play", press_words(t), "Space", 17.0, shown, primary(k, t));
     // The controls change places at once as the set changes, so no word ever slides over another;
     // only their looks fade.
     let mut r = row().key("controls").gap(6.0).center_y().instant_changes();
-    let started = matches!(t.clock, Clock::Ticking { .. } | Clock::Paused { .. });
-    let skip = act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx));
-    if t.phase == Phase::Focus && started {
-        // Letting go is a word, not a glyph: it's the one action that ends a block.
+    if let Some((label, consequence)) = skip_words(t) {
+        // Skip is a word, not a glyph, and sits left of the primary control, outside its place.
+        let skip = act(|s, tx| carry(s, Event::Skip { now: tx.clock() }, tx));
         r = r.child(
-            docked(k, "control-skip", "Let go of this block", "S", 14.0, shown, tab(k, "let go")).on_press_tx(skip),
+            docked(k, "control-skip", label, "S", 14.0, shown, tab(k, "Skip"))
+                .help(format!("{consequence}  S"))
+                .on_press_tx(skip),
         );
-    } else if t.phase != Phase::Focus && !matches!(t.clock, Clock::Ringing { .. }) {
-        r = r.child(docked(k, "control-skip", "Skip break", "S", 14.0, shown, tab(k, "skip")).on_press_tx(skip));
     }
     let place = Place::at(s.place).name;
     let chevron = Shape::new().line([1.0, 2.5], [4.0, 5.5], 1.4, LineCap::Round, k.text.alpha(QUIET)).line(
@@ -164,7 +170,7 @@ pub fn view(s: &State, k: Ink) -> El {
         .key("dock")
         .role("none")
         .pin(None, None, Some(0.0), Some(0.0))
-        .size(DOCK.0, DOCK.1)
+        .padding(MARGIN)
         .on_drag(|_: &mut State, _, _| {})
         .on_hover_change(|s: &mut State, inside, tx: &mut Tx| {
             s.over_controls = inside;
@@ -173,7 +179,7 @@ pub fn view(s: &State, k: Ink) -> El {
                 tx.wake_at(s.controls_until);
             }
         })
-        .child(r.pin(None, None, Some(14.0), Some(14.0)));
+        .child(r);
     if shown {
         dock
     } else {
@@ -196,6 +202,9 @@ fn pick_place(s: &mut State, tx: &mut Tx) {
     });
 }
 
+/// What the keys serve, said once above them: the cycle, and that the timer makes no sound.
+const ABOUT: &str = "A finished block lights a lantern, and four earn a long break. The timer makes no sound, so keep the sunset in sight.";
+
 /// Every key, grouped by what it is for: the timer, the block, and finding your way around.
 const KEYS: [(&str, &[(&str, &str)]); 3] = [
     (
@@ -204,13 +213,13 @@ const KEYS: [(&str, &[(&str, &str)]); 3] = [
             ("Space", "start, pause or resume"),
             ("↑  ↓", "a minute longer or shorter, while it waits"),
             ("drag", "the sun up or down to set the length; space starts it"),
-            ("S", "let go of a block, or skip a break"),
+            ("S", "skip: end a block early, keeping its minutes but no lantern; or skip a break"),
         ],
     ),
     (
         "Block",
         &[
-            ("U", "undo a let go, until you start again"),
+            ("U", "undo a skip, until you start again"),
             ("L", "name the next block"),
             ("1  2  3", "how it felt: deep, steady, drifting"),
         ],
@@ -269,6 +278,13 @@ pub fn keys(status: Option<El>) -> El {
         .child(row().justify_between().center_y().child(line(Ink::light(), "Keys", 15.0, 520.0, BRIGHT)).child(
             button(Ink::light(), "keys-close", "Close", "Close  Esc").on_press_tx(guarded(|s, _| s.keys_open = false)),
         ))
+        .child(
+            text(ABOUT)
+                .key("keys-about")
+                .font(TextStyle::new(SMALL, 450.0))
+                .color(Ink::light().text.alpha(BRIGHT))
+                .wrap(),
+        )
         .child(groups);
     let card = match status {
         Some(words) => card.child(words),

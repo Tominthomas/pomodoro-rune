@@ -184,8 +184,8 @@ impl Totals {
         self.felt.iter().sum()
     }
 
-    /// Blocks let go.
-    pub fn let_go(&self) -> u32 {
+    /// Blocks skipped.
+    pub fn skipped(&self) -> u32 {
         self.blocks - self.lanterns
     }
 
@@ -410,10 +410,10 @@ mod tests {
     }
 
     #[test]
-    fn a_block_let_go_has_no_word_and_lights_no_lantern_but_keeps_its_minutes() {
-        let t = Totals::of(&[block(WED + 10 * H, Outcome::Finished, &[]), block(WED + 11 * H, Outcome::LetGo, &[])]);
-        assert_eq!(block(WED, Outcome::LetGo, &[]).felt(), None);
-        assert_eq!((t.focused, t.lanterns, t.blocks, t.unbroken, t.let_go()), (2100, 1, 2, 1, 1));
+    fn a_skipped_block_has_no_word_and_lights_no_lantern_but_keeps_its_minutes() {
+        let t = Totals::of(&[block(WED + 10 * H, Outcome::Finished, &[]), block(WED + 11 * H, Outcome::Skipped, &[])]);
+        assert_eq!(block(WED, Outcome::Skipped, &[]).felt(), None);
+        assert_eq!((t.focused, t.lanterns, t.blocks, t.unbroken, t.skipped()), (2100, 1, 2, 1, 1));
     }
 
     #[test]
@@ -454,22 +454,22 @@ mod tests {
     fn todays_lanterns_float_on_the_water_until_the_night_makes_them_stars() {
         let mut log = Log::default();
         log.push(block(WED - 5 * H, Outcome::Finished, &[]));
-        for (hour, outcome) in (9..).zip([Outcome::Finished, Outcome::LetGo, Outcome::Finished, Outcome::Finished]) {
+        for (hour, outcome) in (9..).zip([Outcome::Finished, Outcome::Skipped, Outcome::Finished, Outcome::Finished]) {
             log.push(block(WED + hour * H, outcome, &[]));
         }
         let today = UTC.day_of(WED + 12 * H);
         let hours = |blocks: Vec<&Block>| blocks.iter().map(|b| (b.ended - WED) / H).collect::<Vec<_>>();
         let (stars, water) = log.lanterns(UTC, today, 3);
-        assert_eq!((hours(stars), hours(water)), (vec![9], vec![11, 12]), "a lantern let go is neither");
+        assert_eq!((hours(stars), hours(water)), (vec![9], vec![11, 12]), "a block skipped is neither");
         let (stars, water) = log.lanterns(UTC, today, log.next());
         assert_eq!((stars.len(), water.len()), (3, 0), "yesterday's lantern isn't in today's sky");
     }
 
     #[test]
-    fn the_reflection_asks_about_the_last_lantern_not_a_block_let_go() {
+    fn the_reflection_asks_about_the_last_lantern_not_a_skipped_block() {
         let mut log = Log::default();
         log.push(block(WED + 9 * H, Outcome::Finished, &[]));
-        log.push(block(WED + 10 * H, Outcome::LetGo, &[]));
+        log.push(block(WED + 10 * H, Outcome::Skipped, &[]));
         assert_eq!(log.last_lit(), Some(0));
         assert_eq!(Log::default().last_lit(), None);
     }
@@ -481,11 +481,11 @@ mod tests {
         for days_ago in [40, 28, 27, 5, 1, 0, 0] {
             log.push(block(WED + 12 * H - days_ago * 24 * H, Outcome::Finished, &[]));
         }
-        log.push(block(WED + 12 * H - 2 * 24 * H, Outcome::LetGo, &[]));
+        log.push(block(WED + 12 * H - 2 * 24 * H, Outcome::Skipped, &[]));
         assert_eq!(
             log.days_with_focus(UTC, today),
             5,
-            "today, yesterday, two days ago (let go still focused), five and 27 days ago"
+            "today, yesterday, two days ago (skipped, still focused), five and 27 days ago"
         );
     }
 
@@ -504,7 +504,7 @@ mod tests {
         let blocks = [
             named("Reading", Outcome::Finished),
             named("Problem set", Outcome::Finished),
-            named("Problem set", Outcome::LetGo),
+            named("Problem set", Outcome::Skipped),
             block(WED, Outcome::Finished, &[]),
         ];
         assert_eq!(Log::labels(&blocks), vec![("Problem set", 2100), ("Reading", 1500)]);
@@ -549,7 +549,7 @@ mod tests {
         let today = UTC.day_of(WED + 12 * H);
         let old = WED + 12 * H - (KEEP_DAYS + 3) * 24 * H;
         log.push(Block { rated: Some(Felt::Deep), ..block(old, Outcome::Finished, &[]) });
-        log.push(block(old + H, Outcome::LetGo, &[]));
+        log.push(block(old + H, Outcome::Skipped, &[]));
         log.push(block(WED + 10 * H, Outcome::Finished, &[]));
         let before = log.totals_on(UTC, UTC.day_of(old));
         assert!(log.compact(UTC, today));

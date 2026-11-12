@@ -55,16 +55,16 @@ def cycle():
     events = [*label(0.1, "Reading & notes"), *one_minute(1.0), mark(1.6, "wound")]
     t = 2.0
 
-    def block(name, pause=None, let_go=None):
+    def block(name, pause=None, skip_at=None):
         nonlocal t
         events.append(key(t, " "))
         end = t + 60.0
         if pause:
             events.extend([key(t + pause, " "), mark(t + pause + 0.5, f"{name}-paused"), key(t + pause + 2.0, " ")])
             end += 2.0
-        if let_go:
-            events.extend([key(t + let_go, "s"), mark(t + let_go + 1.0, f"{name}-letgo")])
-            end = t + let_go
+        if skip_at:
+            events.extend([key(t + skip_at, "s"), mark(t + skip_at + 1.0, f"{name}-skipped")])
+            end = t + skip_at
         events.extend(
             [mark(end - 0.5, f"{name}-last"), mark(end + 1.0, f"{name}-bell"), mark(end + 4.5, f"{name}-break")]
         )
@@ -86,7 +86,7 @@ def cycle():
     skip_break()
     block("b2", pause=14.0)
     skip_break()
-    block("b3", let_go=45.0)
+    block("b3", skip_at=45.0)
     skip_break()
     block("b4")
     skip_break()
@@ -124,12 +124,12 @@ SCRIPTS = {
         mark(1.4, "shown"),
         mark(4.6, "rested"),
     ],
-    # A block let go and taken straight back runs on to its bell as one block.
+    # A block skipped and taken straight back runs on to its bell as one block.
     "undo": [
         *one_minute(0.1),
         key(1.0, " "),
         key(21.0, "s"),
-        mark(22.0, "letgo"),
+        mark(22.0, "skipped"),
         key(23.0, "u"),
         mark(23.5, "undone"),
         mark(62.5, "bell"),
@@ -166,7 +166,7 @@ SCRIPTS = {
         mark(9.5, "back"),
         mark(10.0, "end"),
     ],
-    # The whole day in one: a label, a block to the bell, a paused block, one let go, two more
+    # The whole day in one: a label, a block to the bell, a paused block, one skipped, two more
     # to earn the long break, and Today. Breaks are skipped with S.
     "cycle": cycle(),
     "lantern-plain": lantern(paused=False),
@@ -183,6 +183,13 @@ SCRIPTS = {
         mark(2.4, "activated"),
         {"t": 3.0, "type": "tap", "key": "control-play"},
         mark(4.0, "started"),
+    ],
+    # Two quick clicks where Start is drawn, as round one's critique made them: they start the
+    # block, then pause it.
+    "double-start": [
+        {"t": 0.1, "type": "tap", "x": 140, "y": 510},
+        {"t": 0.3, "type": "tap", "x": 140, "y": 510},
+        mark(0.8, "inspect"),
     ],
     # With a block running, the pointer rests on the controls' corner: they stay. A click in the
     # corner off any control, and one where a control has faded, never reach the sky.
@@ -238,10 +245,30 @@ SCRIPTS = {
         ]
     ]
     + [mark(16.8, "view")],
+    # Round one's audit: L pressed in Today, then a name full of shortcut letters.
+    "today-label": [*label(0.1, "Study the last unit, slowly"), mark(1.25, "typing"), mark(1.5, "end")],
     # A day of nineteen blocks, opened as a person opens Today.
     "busy-day": [key(0.3, "Escape"), key(0.6, "h"), mark(1.6, "open")],
     # Every key on one card.
     "keys": [key(0.2, "?"), mark(1.0, "open")],
+    # Every menu item, picked from the menu bar rather than pressed: the timer's, Today, a place
+    # and the keys.
+    "menus": [
+        {"t": 0.3, "menu": "timer-press"},
+        mark(2.0, "running"),
+        {"t": 2.2, "menu": "timer-skip"},
+        mark(2.6, "skipped"),
+        {"t": 2.8, "menu": "timer-undo"},
+        mark(3.2, "undone"),
+        {"t": 3.4, "menu": "view-today"},
+        mark(3.8, "today"),
+        {"t": 4.0, "menu": "place-2"},
+        {"t": 4.2, "menu": "view-today"},
+        mark(4.6, "mesa"),
+        {"t": 4.8, "menu": "view-next-place"},
+        {"t": 5.0, "menu": "help-keys"},
+        mark(5.4, "keys"),
+    ],
     # A label longer than the window has room for.
     "long-label": [*label(0.1, "Thermodynamics problem set, chapter seven, the long derivations"), mark(4.5, "end")],
 }

@@ -58,8 +58,10 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         None => format!("{with_focus} {} with focus", if with_focus == 1 { "day" } else { "days" }),
     };
     let head =
-        DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.8))));
-    let mut weeks = col().gap(GAP).focus_group().focus_follows();
+        DAYS.iter().fold(row().gap(GAP), |r, d| r.child(el().w(TILE.0).child(label(k, &d[..1], 10.5, 500.0, 0.9))));
+    // Arrows move between days without opening each one, since opening scrolls the page away
+    // from the grid; Return or Space opens the day reached.
+    let mut weeks = col().gap(GAP).focus_group();
     for week in days.chunks(7) {
         weeks = weeks.child(week.iter().fold(row().gap(GAP), |r, &day| r.child(cell(l, day, today))));
     }
@@ -68,9 +70,9 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         .key("history-scale")
         .gap(5.0)
         .center_y()
-        .child(label(k, "less", 10.5, 450.0, 0.8))
+        .child(label(k, "less", 10.5, 450.0, 0.9))
         .child(samples)
-        .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.8));
+        .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.9));
     col()
         .child(
             row()
@@ -135,6 +137,7 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let key = format!("day-{}", day.0);
     let d = day.date();
     let named = format!("{} {} {}", DAYS[day.weekday() as usize], d.day, MONTHS[d.month as usize - 1]);
+    let named = if day == today { format!("{named}, today") } else { named };
     let number = label(k, &d.day.to_string(), 9.5, if day == today { 640.0 } else { 480.0 }, 0.95);
     let column = |tile: El| col().gap(2.0).child(number).child(tile);
     if day > today {
@@ -151,7 +154,8 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let spoken = if t.blocks == 0 {
         format!("{named}: nothing")
     } else {
-        format!("{named}: {} focused, {} lit", duration(t.focused), t.lanterns)
+        let lit = if t.lanterns == 1 { "1 lantern".to_string() } else { format!("{} lanterns", t.lanterns) };
+        format!("{named}: {} focused, {lit}", duration(t.focused))
     };
     let tile = if t.focused == 0 {
         let still = Shape::new().line(
@@ -172,6 +176,8 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
         .role("button")
         .label(spoken.clone())
         .help(spoken)
+        // The day the page above shows is the pressed one, for VoiceOver as for the eye.
+        .checked(l.day == day)
         .focusable(true)
         .focus_ring(1.5, 1.5, k.text.alpha(0.95))
         .on_hover_change(move |s: &mut State, on, _| {
@@ -184,9 +190,9 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
             if let Some(n) = nav(s) {
                 n.pick_day(day, today);
             }
-            // Arrows press the tile they reach, and the day it opens would otherwise keep the
-            // grid where it was.
-            tx.scroll_into_view(format!("day-{}", day.0));
+            // The answer to picking a day is that day: its strip and numbers at the top of the
+            // page, under the date it now shows.
+            tx.scroll_to("today-scroll", 0.0, 0.0);
         }));
     column(match (l.day == day, day == today) {
         (true, _) => base.border(2.0, k.text.alpha(0.95)),

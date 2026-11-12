@@ -15,7 +15,7 @@ This directory is the maintained source for verifying what a user sees in Pomodo
 - Every recipe drives a committed script in `scripts/` at a mark it names, or a throwaway script the file gives in full. Save a throwaway script as `$RUN/<name>.json`, never in `scripts/`.
 - Act through keys, keyed taps (`{"type":"tap","key":"control-play"}`), sky taps at `190,200` and drags on the sun. Never set state another way.
 - Read text through `look`. Text drawn with `ink` under 0.5 counts as not shown.
-- Expected strings are copied from the app. Compare them exactly, including `·` and the straight apostrophe in `space when you're ready`.
+- Expected strings are copied from the app. Compare them exactly, including `·` and the straight apostrophe in `you're`.
 
 ## Proof and skip reporting
 
@@ -37,10 +37,11 @@ Each feature file starts with an H1 title and one paragraph on the behavior a us
 
 - [Focus block](./focus-block.md) covers starting a block, naming it, the bell, the lantern and the reflection.
 - [Pause and resume](./pause-resume.md) covers Space, the sky, the play control, the Resume button and the knot on the lantern.
-- [Let go and undo](./let-go-undo.md) covers ending a block early, the ring it leaves, undo, and skipping a break.
+- [Skip and undo](./skip-undo.md) covers ending a block early, the ring it leaves, undo, and skipping a break.
 - [Set the length](./set-length.md) covers dragging the sun, the arrow keys, the hint and the long break's length.
 - [Long break](./long-break.md) covers the fourth lantern, the night, the lanterns rising and dawn.
 - [Today and history](./today-history.md) covers Today's numbers, block detail, feelings, renaming and past days.
 - [Places](./places.md) covers Coast, Lake and Mesa by key and by menu.
+- [Menus](./menus.md) covers the Timer, View and Help menus in the menu bar.
 
 Not mapped yet, though `tools/check.py` covers them: the controls in sight while a block waits and receding once it runs (`hover`, `dock`), the activating click (`activate`, `activate-control`), the keys card (`keys`) and long labels (`long-label`).

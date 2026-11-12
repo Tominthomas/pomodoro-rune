@@ -11,7 +11,7 @@ APP=target/release/pomodoro
 OUT=shots/review
 TMP=$(mktemp -d)
 rm -rf "$OUT" && mkdir -p "$OUT"
-SCENES="wound focus-early focus-late paused bell bell-bloom let-go short long evening"
+SCENES="wound focus-early focus-late paused bell bell-bloom skipped short long evening"
 
 # A scene name, and when to take it: the bell twice, at the green flash and as the lantern blooms.
 shot() {
@@ -19,7 +19,7 @@ shot() {
     wound) echo "-- 0.6" ;;
     bell) echo "bell 1.4" ;;
     bell-bloom) echo "bell 2.0" ;;
-    let-go) echo "let-go 1.1" ;;
+    skipped) echo "skipped 1.1" ;;
     *) echo "$1 0.6" ;;
   esac
 }

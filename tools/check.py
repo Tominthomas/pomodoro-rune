@@ -28,11 +28,14 @@ FPS = {
     "activate": "60",
     "activate-control": "60",
     "dock": "30",
+    "double-start": "60",
     "drag": "60",
     "today": "60",
     "bell": "60",
     "four-labels": "60",
     "busy-day": "30",
+    "today-label": "60",
+    "menus": "30",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
 SCENE = {
@@ -41,6 +44,7 @@ SCENE = {
     "night": "night-minute",
     "four-labels": "today",
     "busy-day": "busy",
+    "today-label": "today",
 }
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
@@ -228,7 +232,7 @@ CHECKS = [
         "cycle",
         "b1-bell",
         lambda t: (
-            phase(t) == "a lantern for that one"
+            phase(t) == "1 of 4 lanterns · 5-minute break ready"
             and (text(t, "time"), text(t, "time-unit")) == ("1 min", "focused")
             and (t["@a11y"]["time"].get("name"), spoken(t, "time")) == ("Block complete", "1 minute focused")
             and lanterns(t) == ["lantern-0"]
@@ -238,7 +242,9 @@ CHECKS = [
         "then a short break waits, offering three words",
         "cycle",
         "b1-break",
-        lambda t: phase(t) == "rest · space when you're ready" and lanterns(t) == ["lantern-0"] and "felt-deep" in t,
+        lambda t: (
+            phase(t) == "1 of 4 lanterns · 5-minute break ready" and lanterns(t) == ["lantern-0"] and "felt-deep" in t
+        ),
     ),
     (
         "the label carries over to the next block",
@@ -251,25 +257,27 @@ CHECKS = [
         "and still lights a lantern, with a knot for the pause",
         "cycle",
         "b2-break",
-        lambda t: label(t, "lantern-1") == "Lantern 2, paused once",
+        lambda t: (
+            label(t, "lantern-1") == "Lantern 2, paused once" and phase(t) == "2 of 4 lanterns · 5-minute break ready"
+        ),
     ),
     (
-        "a block let go rings out with no lantern",
+        "a skipped block rings out with no lantern, and says its minutes still count",
         "cycle",
-        "b3-letgo",
-        lambda t: phase(t) == "let go; the minutes still count" and len(lanterns(t)) == 2,
+        "b3-skipped",
+        lambda t: phase(t) == "Skipped. 1 min still counts, no lantern." and len(lanterns(t)) == 2,
     ),
     (
         "and doesn't count toward the cycle",
         "cycle",
         "b3-break",
-        lambda t: phase(t) == "rest · space when you're ready" and len(lanterns(t)) == 2,
+        lambda t: phase(t) == "Skipped. 1 min still counts, no lantern." and len(lanterns(t)) == 2 and "undo" in t,
     ),
     (
         "four lanterns earn the long break",
         "cycle",
         "long",
-        lambda t: phase(t) == "long rest · space when you're ready" and len(lanterns(t)) == 4,
+        lambda t: phase(t) == "4 of 4 lanterns · 15-minute long break ready" and len(lanterns(t)) == 4,
     ),
     ("the long break can be set to a minute too", "cycle", "long-set", lambda t: text(t, "time") == "01:00"),
     (
@@ -288,22 +296,22 @@ CHECKS = [
         lambda t: len(lanterns(t)) == 4 and all(t[k]["rect"][1] + t[k]["rect"][3] / 2 < 330 for k in lanterns(t)),
     ),
     (
-        "Today counts four lanterns and one let go, and the numbers add up",
+        "Today counts four lanterns and one skipped, and the numbers add up",
         "cycle",
         "today",
         lambda t: (
             text(t, "stat-lanterns-value") == "4"
-            and text(t, "stat-let-go-value") == "1"
+            and text(t, "stat-skipped-value") == "1"
             and "stat-sessions" not in t
             and len(lanterns(t, "day-lantern-")) == 4
             and len(lanterns(t, "day-ring-")) == 1
         ),
     ),
     (
-        "the block let go is a ring that keeps its minutes",
+        "the skipped block is a ring that keeps its minutes",
         "cycle",
         "today",
-        lambda t: "let go, 1 min kept" in label(t, "day-ring-0") and text(t, "stat-focused-value") == "5 min",
+        lambda t: "skipped, 1 min kept" in label(t, "day-ring-0") and text(t, "stat-focused-value") == "5 min",
     ),
     (
         "Today knows what the day was for and how it felt",
@@ -362,13 +370,13 @@ CHECKS = [
         ),
     ),
     (
-        "a block let go can be undone for a moment",
+        "a skipped block can be undone until the next start",
         "undo",
-        "letgo",
+        "skipped",
         lambda t: (
             "undo" in t
-            and phase(t) == "let go; the minutes still count"
-            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "kept")
+            and phase(t) == "Skipped before a minute. No lantern."
+            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "focused")
         ),
     ),
     (
@@ -381,13 +389,15 @@ CHECKS = [
         "and it reaches its bell as one block",
         "undo",
         "today",
-        lambda t: text(t, "stat-lanterns-value") == "1" and "stat-let-go" not in t and "day-ring-0" not in t,
+        lambda t: text(t, "stat-lanterns-value") == "1" and "stat-skipped" not in t and "day-ring-0" not in t,
     ),
     (
         "the click that brings the window forward starts nothing",
         "activate",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
+        lambda t: (
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
+        ),
     ),
     (
         "the next click starts the sunset",
@@ -399,9 +409,21 @@ CHECKS = [
         "the activating click on a control does nothing either",
         "activate-control",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
+        lambda t: (
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
+        ),
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
+    (
+        "two quick clicks on Start start the block and pause it, and end nothing",
+        "double-start",
+        "inspect",
+        lambda t: (
+            phase(t) == "the sky waits · space to resume"
+            and t["@a11y"]["control-play"].get("name") == "Resume"
+            and "undo" not in t
+        ),
+    ),
     (
         "the controls stay while the pointer rests on them",
         "dock",
@@ -431,6 +453,27 @@ CHECKS = [
         ),
     ),
     ("Space starts it", "drag", "started", lambda t: phase(t) == "focus"),
+    (
+        "L in Today names the next block on the sunset, and its letters start, skip and open nothing",
+        "today-label",
+        "end",
+        lambda t: (
+            text(t, "top-text") == "Study the last unit, slowly"
+            and text(t, "time") == "25:00"
+            and "today-title" not in t
+            and "undo" not in t
+            and "Coast" in label(t, "control-place")
+        ),
+    ),
+    (
+        "the name field says what it names to VoiceOver, with what is typed as its value",
+        "today-label",
+        "typing",
+        lambda t: (
+            t["@a11y"]["label-field"].get("name") == "Name for the next block"
+            and t["@a11y"]["label-field"].get("value") == "Study the last unit, slowly"
+        ),
+    ),
     (
         "a long label is cut short inside the window",
         "long-label",
@@ -472,6 +515,23 @@ CHECKS = [
     ),
     ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
+    ("the Timer menu starts the block", "menus", "running", lambda t: label(t, "control-play") == "Pause"),
+    ("skips it", "menus", "skipped", lambda t: phase(t) == "Skipped before a minute. No lantern." and "undo" in t),
+    ("and takes the skip back", "menus", "undone", lambda t: phase(t) == "focus" and "undo" not in t),
+    ("the View menu opens Today", "menus", "today", lambda t: text(t, "today-title") == "Today"),
+    ("picks a place, and closes Today", "menus", "mesa", lambda t: label(t, "control-place") == "Place: Mesa"),
+    (
+        "the next place wraps around, and Help opens the keys",
+        "menus",
+        "keys",
+        lambda t: label(t, "control-place") == "Place: Coast" and label(t, "keys") == "Keys",
+    ),
+    (
+        "and says what the lanterns earn and that the timer is silent",
+        "keys",
+        "open",
+        lambda t: "four earn a long break" in text(t, "keys-about") and "no sound" in text(t, "keys-about"),
+    ),
     ("half a minute out, the sun's lower limb is still above the sea", "bell", "half", lambda t: sun_bottom(t) < 329.0),
     ("at 00:00 it touches the water", "bell", "zero", lambda t: abs(sun_bottom(t) - 330.0) < 0.6),
     (
@@ -506,6 +566,17 @@ CHECKS = [
             and "back-to-today" in t
             and "now" not in t
             and text(t, "stat-lanterns-value") != "4"
+        ),
+    ),
+    (
+        "and shows that day's strip and numbers at the top, under its held date",
+        "today",
+        "yesterday",
+        lambda t: (
+            t["day-strip-view"]["rect"][1] >= t["today-scroll"]["rect"][1] - 0.5
+            and t["stat-focused-value"]["rect"][1] + t["stat-focused-value"]["rect"][3]
+            <= t["today-scroll"]["rect"][1] + t["today-scroll"]["rect"][3]
+            and held(t)
         ),
     ),
     (
