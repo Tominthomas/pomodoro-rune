@@ -323,6 +323,7 @@ SCRIPTS = {
         {"t": 2.8, "type": "tap", "key": f"day-{TODAY - 7}"},
         mark(3.8, "past"),
     ],
+    "saved-frame": [mark(0.2, "open")],
     # A label longer than the window has room for.
     "long-label": [*label(0.1, "Thermodynamics problem set, chapter seven, the long derivations"), mark(4.5, "end")],
 }
