@@ -64,7 +64,9 @@ pub fn scrim(k: Ink, f: Frame) -> El {
     let shade = k.shade;
     let a = if k == Ink::dark() { 0.4 } else { 1.0 };
     if controls::two_rows(f) {
-        // Narrow, the readout rises into the sky, so the shade rises with it, across the window.
+        // Narrow, the readout rises into the sky and over the land, so the shade rises with it,
+        // across the window, and is as strong for dark ink as for light.
+        let a = 1.0;
         let reach = top(f) + 60.0;
         return el().key("scrim").absolute(0.0, f.h - reach).size(f.w, reach).a11y_hidden().linear_gradient(
             std::f32::consts::PI,

@@ -237,7 +237,8 @@ fn lake(mut sh: Shape, near: Color, far: Color, up: f32, f: Frame) -> Shape {
 fn mesa(sh: Shape, near: Color, far: Color, up: f32, f: Frame) -> Shape {
     let p = |x, h| at(f, x, h, up);
     let butte = |x0: f32, x1: f32, h: f32, skirt: f32| {
-        let (x0, x1) = (x0 * f.w / W, x1 + x0 * (f.w / W - 1.0));
+        let shift = f32::midpoint(x0, x1) * (f.w / W - 1.0);
+        let (x0, x1) = (x0 + shift, x1 + shift);
         Path::new()
             .move_to(p(x0 - skirt, -1.0))
             .quad_to(p(x0 - skirt * 0.2, h * 0.1), p(x0 - 2.0, h * 0.58))
