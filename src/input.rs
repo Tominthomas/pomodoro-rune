@@ -4,9 +4,9 @@
 use rune::{Drag, Key, KeyEvent, Phase as DragPhase, Tx};
 
 use crate::log::Felt;
-use crate::timer::{Clock, Event};
+use crate::timer::Event;
 use crate::{
-    Asking, Page, SLOP, State, carry, edit_label, finish_label, open_today, rate, scene, set_larger, set_place,
+    Asking, LetGo, Page, SLOP, State, carry, edit_label, finish_label, open_today, rate, scene, set_larger, set_place,
 };
 
 /// Escape closes whatever is open, innermost first.
@@ -92,9 +92,10 @@ pub fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
     true
 }
 
-/// A tap on the sky starts or pauses; dragging up or down while the block waits raises or
+/// A tap on the sky starts or pauses; dragging up or down while a block waits raises or
 /// lowers the sun, which sets the block's length, and letting go keeps it, waiting for a press
-/// as the arrow keys do. The click that brings the window forward does neither.
+/// as the arrow keys do. During a break it sets the block after it. The click that brings the
+/// window forward does neither.
 pub fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
     let now = tx.clock();
     match d.phase {
@@ -108,20 +109,24 @@ pub fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
             }
         }
         DragPhase::Move => {
-            let scrubbing = matches!(s.timer.clock, Clock::Scrubbing { .. });
-            if !scrubbing && (s.spent || d.dx.hypot(d.dy) < SLOP || s.timer.clock != Clock::Wound) {
+            let Some(phase) = s.timer.settable() else { return };
+            if s.timer.setting.is_none() && (s.spent || d.dx.hypot(d.dy) < SLOP) {
                 return;
             }
-            let from = match s.timer.clock {
-                Clock::Scrubbing { secs } => secs,
-                _ => f64::from(s.timer.length()),
-            };
+            if s.timer.setting.is_none() {
+                s.now = now;
+                s.took_up = s.sun_rise();
+            }
+            let from = s.timer.setting.map_or(f64::from(s.timer.lengths.of(phase)), |setting| setting.secs);
             // The pointer moves in the view's points; the sun in the window's.
             let to = scene::length_at(scene::rise(from) + f64::from((d.data - d.y) * s.zoom()));
             d.data = d.y;
             carry(s, Event::Scrub { secs: to - from }, tx);
         }
-        DragPhase::Up if matches!(s.timer.clock, Clock::Scrubbing { .. }) => carry(s, Event::Release, tx),
+        DragPhase::Up if s.timer.setting.is_some() => {
+            s.let_go = Some(LetGo { at: now, rise: s.sun_rise() });
+            carry(s, Event::Release, tx);
+        }
         DragPhase::Up if !s.spent && !d.cancelled() && d.dx.hypot(d.dy) < SLOP => {
             carry(s, Event::Press { now }, tx);
         }

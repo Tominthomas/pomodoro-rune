@@ -71,6 +71,79 @@ fn the_arrows_leave_the_length_alone_while_today_or_the_keys_are_open() {
 }
 
 #[test]
+fn every_block_starts_its_sun_at_the_top_and_sets_it_across_the_whole_block() {
+    let mut long = App::new();
+    let mut short = App::new();
+    short.one_minute();
+    let bottom = |app: &App| {
+        let [_, y, _, h] = app.rect("sun");
+        y + h
+    };
+    let sea = H * 11.0 / 18.0;
+    assert_eq!(short.rect("sun"), long.rect("sun"), "a one-minute block waits with the sun as high as a long one");
+    assert_eq!(bottom(&short), sea - scene::RISE, "at the top");
+    short.space();
+    long.space();
+    short.wait(30.0);
+    long.wait(750.0);
+    assert!((bottom(&short) - (sea - scene::RISE / 2.0)).abs() < 0.5, "half a one-minute block is half the sunset");
+    assert!((bottom(&long) - bottom(&short)).abs() < 0.5, "as it is for 25 minutes");
+}
+
+#[test]
+fn the_sun_glides_under_the_hand_and_eases_back_to_the_top_when_let_go() {
+    let mut app = App::new();
+    let top = app.rect("sun");
+    let at = app.hold_sun(31.0);
+    assert!((app.rect("sun")[1] - top[1] - 31.0).abs() < 0.01, "point for point under the pointer, between minutes");
+    let held = app.time();
+    let minutes: u32 = held.trim_end_matches(" min").parse().expect("whole minutes while held");
+    assert!(minutes < 25, "lower is shorter: {held}");
+    assert_eq!(app.phase(), "release to set the length");
+    app.let_go(at);
+    let gliding = app.rect("sun")[1];
+    assert!(gliding > top[1] + 1.0, "it eases back rather than jumping: {gliding}");
+    app.wait(0.5);
+    assert_eq!(app.rect("sun"), top, "every block starts at the top");
+    assert_eq!((app.time(), app.phase()), (format!("{minutes:02}:00"), "focus · space to begin".into()));
+}
+
+#[test]
+fn a_sun_taken_up_again_as_it_eases_back_moves_on_from_where_it_is() {
+    let mut app = App::new();
+    let top = app.rect("sun")[1];
+    let at = app.hold_sun(60.0);
+    app.let_go(at);
+    app.wait(0.1);
+    let easing = app.rect("sun")[1] - top;
+    assert!(easing > 40.0, "still on its way back: {easing}");
+    app.hold_sun(6.0);
+    let held = app.rect("sun")[1] - top;
+    assert!(held > easing - 8.0, "it stays under the hand, with no jump back to the top: {held}");
+}
+
+#[test]
+fn dragging_during_a_break_sets_the_block_after_it_and_the_break_runs_on() {
+    let mut app = App::new();
+    app.one_minute();
+    app.run_to_bell();
+    app.wait(RING + 0.5);
+    app.space();
+    assert_eq!(app.phase(), "rest");
+    let at = app.hold(190.0, 200.0, -60.0);
+    let held = app.time();
+    let minutes: u32 = held.trim_end_matches(" min").parse().expect("the next block's minutes");
+    assert!(minutes > 1, "higher is longer: {held}");
+    assert_eq!(app.read("time-unit").as_deref(), Some("next focus"));
+    assert_eq!(app.node("time").unwrap()["name"], "Next focus length");
+    app.let_go(at);
+    app.wait(10.0);
+    assert_eq!((app.time(), app.phase()), ("04:50".into(), "rest".into()), "the break ran on all along");
+    app.char("s");
+    assert_eq!(app.time(), format!("{minutes:02}:00"), "the next block waits at the length set");
+}
+
+#[test]
 fn the_bell_lights_a_lantern_and_a_break_waits_with_the_question() {
     let mut app = App::new();
     app.one_minute();

@@ -246,15 +246,28 @@ SCRIPTS = {
         {"t": 9.6, "type": "tap", "key": "control-play"},
         mark(10.5, "faded-click"),
     ],
-    # Dragging the sun down sets a shorter block, and letting go only sets it.
+    # Dragging the sun down from the top sets a shorter block, and letting go only sets it.
     "drag": [
-        {"t": 0.2, "type": "down", "x": 186, "y": 140},
-        {"t": 0.3, "type": "move", "x": 186, "y": 170},
-        {"t": 0.4, "type": "move", "x": 186, "y": 205},
-        {"t": 0.6, "type": "up", "x": 186, "y": 205},
+        {"t": 0.2, "type": "down", "x": 186, "y": 54},
+        {"t": 0.3, "type": "move", "x": 186, "y": 70},
+        {"t": 0.4, "type": "move", "x": 186, "y": 85},
+        mark(0.5, "held"),
+        {"t": 0.6, "type": "up", "x": 186, "y": 85},
         mark(3.0, "released"),
         key(3.5, " "),
         mark(5.0, "started"),
+    ],
+    # During a short break (the `short` scene), dragging the sky up sets the next block longer.
+    "drag-break": [
+        mark(0.5, "resting"),
+        {"t": 1.0, "type": "down", "x": SKY[0], "y": SKY[1]},
+        {"t": 1.1, "type": "move", "x": SKY[0], "y": SKY[1] - 30},
+        {"t": 1.2, "type": "move", "x": SKY[0], "y": SKY[1] - 60},
+        mark(1.3, "held"),
+        {"t": 1.4, "type": "up", "x": SKY[0], "y": SKY[1] - 60},
+        mark(2.0, "released"),
+        key(2.5, "s"),
+        mark(3.0, "next"),
     ],
     # A word given is noted, then folds away; a question left alone fades into the break.
     "reflect": [

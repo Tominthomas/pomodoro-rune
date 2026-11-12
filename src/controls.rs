@@ -88,7 +88,7 @@ pub fn press_words(t: &Timer) -> &'static str {
 /// is a block or a break to skip. The dock and the menu both offer it.
 pub fn skip_words(t: &Timer) -> Option<(&'static str, &'static str)> {
     match (t.phase, &t.clock) {
-        (_, Clock::Ringing { .. }) | (Phase::Focus, Clock::Wound | Clock::Scrubbing { .. }) => None,
+        (_, Clock::Ringing { .. }) | (Phase::Focus, Clock::Wound) => None,
         (Phase::Focus, _) => Some(("Skip this block", "End this block now: its minutes count, no lantern")),
         _ => Some(("Skip break", "Skip the rest of this break")),
     }

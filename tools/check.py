@@ -31,6 +31,7 @@ FPS = {
     "dock": "30",
     "double-start": "60",
     "drag": "60",
+    "drag-break": "60",
     "today": "60",
     "bell": "60",
     "four-labels": "60",
@@ -48,6 +49,7 @@ SCENE = {
     "busy-day": "busy",
     "today-label": "today",
     "history-larger-small": "today",
+    "drag-break": "short",
 }
 # Scripts rendered in a window of another size than the first, 380 x 540.
 SIZE = {
@@ -502,15 +504,38 @@ CHECKS = [
         lambda t: phase(t) == "focus",
     ),
     (
-        "letting go of the sun sets a shorter block and starts nothing",
+        "a waiting sun stands at the top, and the hand holds it point for point, in whole minutes",
+        "drag",
+        "held",
+        lambda t: (
+            abs(t["sun"]["rect"][1] - (18.0 + 31.0)) < 0.5
+            and phase(t) == "release to set the length"
+            and text(t, "time") == "16 min"
+        ),
+    ),
+    (
+        "letting go of the sun sets a shorter block, starts nothing, and the sun is back at the top",
         "drag",
         "released",
         lambda t: (
             phase(t) == "focus · space to begin"
-            and text(t, "time") not in (None, "25:00")
-            and text(t, "time").endswith(":00")
+            and text(t, "time") == "16:00"
+            and abs(t["sun"]["rect"][1] - 18.0) < 0.5
         ),
     ),
+    (
+        "during a break, a drag sets the next block, and the break's time steps aside",
+        "drag-break",
+        "held",
+        lambda t: text(t, "time") == "48 min" and text(t, "time-unit") == "next focus",
+    ),
+    (
+        "letting go, the break runs on",
+        "drag-break",
+        "released",
+        lambda t: phase(t) == "rest" and text(t, "time").startswith("03:"),
+    ),
+    ("the next block waits at the length set", "drag-break", "next", lambda t: text(t, "time") == "48:00"),
     ("Space starts it", "drag", "started", lambda t: phase(t) == "focus"),
     (
         "L in Today names the next block on the sunset, and its letters start, skip and open nothing",

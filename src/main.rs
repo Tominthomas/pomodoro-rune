@@ -45,6 +45,8 @@ const MOTION_FPS: f64 = 20.0;
 const BELL_FPS: f64 = 60.0;
 /// A press that travels less than this is a tap, not a drag on the sun.
 const SLOP: f32 = 4.0;
+/// Once a hand lets go of the sun, it takes this long to ease back to the top.
+const GLIDE: f64 = 0.45;
 /// The hover controls stay this long after the pointer stops.
 const CONTROLS_LINGER: f64 = 2.0;
 /// A press this soon after the window comes forward is the click that brought it forward.
@@ -61,6 +63,14 @@ const CLOSE_WAIT: Duration = Duration::from_secs(2);
 enum Page {
     Scene,
     Today(today::Nav),
+}
+
+/// A hand letting go of the sun at `at`, on the window's clock, `rise` points above the sea: it
+/// eases back to the top from there.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct LetGo {
+    at: f64,
+    rise: f32,
 }
 
 /// How did that block feel: asked of one lantern, from its bell.
@@ -90,6 +100,7 @@ struct Timed {
     beckoned: bool,
     asking: Asking,
     day: Day,
+    gliding: bool,
 }
 
 #[expect(
@@ -151,6 +162,11 @@ pub struct State {
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
     /// block's morning comes up from there.
     dawn_from: Option<(f64, Dawn)>,
+    /// How high the sun stood when a hand last took it up: the top, unless it was still easing
+    /// back there. The hand moves it on from where it was.
+    took_up: f32,
+    /// When a hand last let go of the sun, and how high it held it.
+    let_go: Option<LetGo>,
     /// The system's Reduce Motion, as the last view saw it; the frame pacing reads it.
     reduced: Cell<bool>,
     store: Store,
@@ -255,6 +271,8 @@ impl State {
             always_time: false,
             window: Cell::new((W, H)),
             dawn_from: None,
+            took_up: scene::RISE,
+            let_go: None,
             reduced: Cell::new(false),
             store,
             save_error: None,
@@ -288,7 +306,7 @@ impl State {
     /// Whether the controls show: always while a block or a break waits to start, so the first
     /// thing to do is in sight, and once it runs, only while beckoned.
     fn controls_shown(&self) -> bool {
-        matches!(self.timer.clock, Clock::Wound | Clock::Scrubbing { .. }) || self.beckoned()
+        self.timer.clock == Clock::Wound || self.beckoned()
     }
 
     /// Whether the pointer or the keyboard has called the hover controls out: the pointer moves
@@ -303,6 +321,7 @@ impl State {
             && self.study.log.blocks.is_empty()
             && self.timer.phase == Phase::Focus
             && self.timer.clock == Clock::Wound
+            && self.timer.setting.is_none()
     }
 
     /// What the reflection shows now: open from the bell until a word is given (then noted
@@ -323,7 +342,7 @@ impl State {
     }
 
     fn timed(&self) -> Timed {
-        Timed { beckoned: self.beckoned(), asking: self.asking(), day: self.today() }
+        Timed { beckoned: self.beckoned(), asking: self.asking(), day: self.today(), gliding: self.gliding() }
     }
 
     /// The next moment the window must wake by the clock alone, on the window's clock: when
@@ -333,6 +352,9 @@ impl State {
         at.extend(self.timer.due());
         if self.controls_until > self.now {
             at.push(self.controls_until);
+        }
+        if let Some(let_go) = self.let_go {
+            at.push(let_go.at + GLIDE);
         }
         if let Some(r) = self.reflect {
             at.push(r.answered.map_or(r.asked + RING + ASK_FOR, |a| a + ACKNOWLEDGED));
@@ -347,13 +369,33 @@ impl State {
         (self.timer.phase == Phase::Focus && k < 1.0).then_some(Dawn { k: k.max(0.0), ..d })
     }
 
+    /// How high the sun's path starts, in points above the sea: the top for every block. While a
+    /// hand sets the waiting block, the sun rides as far above or below where it was taken up as
+    /// the hand has moved the length, and once let go it eases back to the top.
+    fn sun_rise(&self) -> f32 {
+        let t = &self.timer;
+        let from_top = |secs: f64| (scene::rise(secs) - scene::rise(f64::from(t.lengths.of(Phase::Focus)))) as f32;
+        match (t.setting, self.let_go) {
+            (Some(setting), _) if t.phase == Phase::Focus => self.took_up + from_top(setting.secs),
+            (_, Some(LetGo { at, rise })) if self.gliding() => {
+                rise + (scene::RISE - rise) * scene::ease(((self.now - at) / GLIDE) as f32)
+            }
+            _ => scene::RISE,
+        }
+    }
+
+    /// Whether the sun is still easing back to the top after a hand let go of it.
+    fn gliding(&self) -> bool {
+        self.let_go.is_some_and(|let_go| self.now - let_go.at < GLIDE) && !self.reduced.get()
+    }
+
     /// How often the scene redraws on its own right now, if at all. A still scene costs nothing
     /// between the digits' once-a-second change.
     fn motion(&self) -> Option<f64> {
         if !self.visible || self.reduced.get() || matches!(self.page, Page::Today(_)) {
             return None;
         }
-        if self.dawn().is_some() {
+        if self.dawn().is_some() || self.gliding() {
             return Some(BELL_FPS);
         }
         match self.timer.clock {
@@ -595,7 +637,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         sky,
         place: Place::at(s.place),
         dark,
-        length: s.timer.length(),
+        rise: s.sun_rise(),
         drift: s.drift,
         water: &water,
         stars: &stars,
