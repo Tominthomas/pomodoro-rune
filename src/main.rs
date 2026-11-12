@@ -674,11 +674,19 @@ fn on_focus(s: &mut State, key: bool, tx: &mut Tx) {
     }
 }
 
+/// The size the window opens at: the size it last had, so it doesn't open small and then grow.
+/// A headless run never reads it and renders at the size it is given. A saved size below the
+/// smallest window is one the window can't have, so it is dropped.
+fn opening_size(headless: bool, saved: impl FnOnce() -> Option<(f32, f32)>) -> (f32, f32) {
+    if headless {
+        return (W, H);
+    }
+    saved().filter(|&(w, h)| w >= W && h >= H).unwrap_or((W, H))
+}
+
 fn main() {
     rune::prewarm_gpu();
-    // The window opens at the size it last had, so it doesn't open small and then grow; a
-    // headless run always renders at the size it is given.
-    let size = if rune::tooling::headless_run().is_some() { None } else { rune_mac::saved_size(FRAME) };
+    let size = opening_size(rune::is_headless(), || rune_mac::saved_size(FRAME));
     let app = rune::App::new(AppSpec::<State> {
         scenes: demo::SCENES,
         fonts: &[include_bytes!("../assets/fonts/Inter.ttf")],
@@ -686,7 +694,7 @@ fn main() {
         poll: Some(poll),
         on_key: Some(input::on_key),
         min_size: Some((W, H)),
-        ..AppSpec::new("Pomodoro", size.unwrap_or((W, H)), || unreachable!("App::init builds the state"), view)
+        ..AppSpec::new("Pomodoro", size, || unreachable!("App::init builds the state"), view)
     });
     let handle = app.handle();
     app.init(move || init(handle))
