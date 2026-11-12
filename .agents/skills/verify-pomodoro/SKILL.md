@@ -39,7 +39,7 @@ Pick the feature file in [`features/`](features/README.md). It names the scene, 
 
 Prefer element keys (`control-play`, `day-lantern-0`, `detail-rename`) to coordinates. The sky has no single key target that stays clear of the readout, so scripts tap it at `190,200`.
 
-Use `--fps 60` for any script where a tap or a digit must land on time (`start`, `activate`, `activate-control`, `drag`, `today`, `bell`). Use `--fps 10` for the five-minute scripts (`cycle`, `reflect`, `undo`, `lantern-*`). The timer runs on deadlines, not frames, so 10 fps keeps those quick and gives the same answers. `tools/check.py` has the table in `FPS`.
+Use `--fps 60` for any script where a tap or a digit must land on time (`start`, `activate`, `activate-control`, `drag`, `drag-break`, `today`, `bell`). Use `--fps 10` for the five-minute scripts (`cycle`, `reflect`, `undo`, `lantern-*`). The timer runs on deadlines, not frames, so 10 fps keeps those quick and gives the same answers. `tools/check.py` has the table in `FPS`.
 
 ## Evidence
 
