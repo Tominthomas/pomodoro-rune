@@ -206,13 +206,6 @@ fn init(handle: AppHandle<State>) -> State {
     };
     let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
     let app = handle.clone();
-    if !headless {
-        let menu = handle.clone();
-        handle.update(move |s: &mut State, _| {
-            s.tray = tray::Tray::new(menu);
-            tray::sync(s);
-        });
-    }
     let mut s = restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()
@@ -564,6 +557,11 @@ fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
     s.now = now;
     if !s.framed {
         s.framed = rune_mac::remember_frame(FRAME);
+        // The sun's status item is a window too, and `remember_frame` names every window it finds,
+        // so the sun goes up only once the app's window holds the name.
+        if s.framed {
+            s.tray = s.app.clone().and_then(tray::Tray::new);
+        }
     }
     let mut changed = false;
     if let Some(timer) = s.study.roll_over(s.cal, s.unix(), &s.timer) {
