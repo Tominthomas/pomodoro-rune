@@ -4,7 +4,7 @@
 
 ## Sub-features
 
-- `today-open` opens Today with `H`, a click on the time (`time-today`) or the `control-today` control and closes it with `H`, `Esc` or `today-close`.
+- `today-open` opens Today with `H` or the `control-today` control (labelled Today) and closes it with `H`, `Esc` or `today-close` (Back to sunset). The `timer-bar` at the top shows the running timer and takes Pause, Resume, Start and Undo let go.
 - `today-numbers` shows `stat-focused-value`, `stat-lanterns-value` and `stat-let-go-value`, the `day-lantern-N` and `day-ring-N` marks, `for-<label>` and `reflected`.
 - `today-detail` opens a block from its mark into `detail`, with `detail-when` and `detail-about`.
 - `today-felt` gives, changes or clears a block's feeling with `detail-felt-deep`, `detail-felt-steady` and `detail-felt-drifting`.
@@ -14,7 +14,7 @@
 
 ## How to get to it (user POV)
 
-- Press `H`, click the time, or show the controls and click the Today control.
+- Press `H` or click the Today control.
 - Click a lantern or ring on the timeline, then a word or `rename` / `name it`.
 - Click a day in the four-week grid, then `Today` to come back.
 - Press `Esc` to back out one step at a time.
@@ -45,5 +45,5 @@ Preconditions:
 - `day-lantern-N` counts lit lanterns and `day-ring-N` counts blocks let go, each from 0 in time order. They aren't block serials.
 - The day number in `day-<n>` is days since 1970 for a day that starts at 4 a.m. Headless runs are fixed at UTC, so today is `day-20768`.
 - The rename field holds the old name when it opens. Select all with ⌘A before typing, or the new text is appended.
-- The `explain` card shows in the `today` scene and on a first launch until `explain-dismiss` is clicked. Today's layout depends on which cards show, so tap by key, not by coordinates.
+- Under the held top (`timer-bar` and the title), Today scrolls in `today-scroll`. History sits below the fold, so scroll first (a `{"type":"wheel","x":190,"y":400,"dy":-2000}` event) before tapping a day tile by key. The `busy` scene has 19 blocks in one day, and the strip (`day-strip-view`) scrolls sideways.
 - Today's background takes no clicks. A tap off any control should leave Today open, and the `clicked` mark proves that.

@@ -5,10 +5,10 @@ While a block or a break waits, the user sets its length in one-minute steps by 
 ## Sub-features
 
 - `length-arrows` makes a block one minute longer with Up or Right and one minute shorter with Down or Left.
-- `length-steppers` makes it a minute shorter or longer with the `shorter` and `longer` buttons, which show beside the time while the clock waits and the controls show.
+- `length-steppers` makes it a minute shorter or longer with the `shorter` and `longer` buttons, which sit beside the time while the clock waits. They are always in the accessibility tree and drawn once the pointer moves or Tab is pressed.
 - `length-drag` raises or lowers the sun to set the length. The phase line reads `release to set the length` while dragging.
 - `length-release` sets the length on release and starts nothing.
-- `length-hint` shows `drag the sun or press ↑ ↓ to set the length` with a `got it` button on a first launch.
+- `length-hint` shows `or drag the sun first to change the length` with a `got it` button on a first launch, under the phase line `focus · click the sky or press space to begin`.
 - `length-break` sets a waiting break's length with the arrows or a drag.
 
 ## How to get to it (user POV)
