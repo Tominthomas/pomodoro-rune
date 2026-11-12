@@ -46,6 +46,13 @@ SCENE = {
     "busy-day": "busy",
     "today-label": "today",
 }
+# Scripts rendered in a window of another size than the first, 380 x 540.
+SIZE = {
+    "size-tall": "420x780",
+    "size-wide": "900x600",
+    "size-larger": "475x675",
+    "size-larger-small": "380x540",
+}
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
 # inherits. src/tests/mod.rs holds the same floor.
@@ -65,7 +72,19 @@ def ink(e):
 
 def run(script, at, out_flag, out, extra=()):
     scene = ["--scene", SCENE[script]] if script in SCENE else []
-    cmd = [APP, "--script", ROOT / "scripts" / f"{script}.json", *scene, out_flag, out, "--at", f"mark:{at}", *extra]
+    size = ["--size", SIZE[script]] if script in SIZE else []
+    cmd = [
+        APP,
+        "--script",
+        ROOT / "scripts" / f"{script}.json",
+        *scene,
+        *size,
+        out_flag,
+        out,
+        "--at",
+        f"mark:{at}",
+        *extra,
+    ]
     subprocess.run(cmd, check=True, capture_output=True)
 
 
@@ -78,6 +97,7 @@ def tree(script, at):
         dump = json.loads(out.read_text())
         t = {e["key"]: e for e in dump["elements"] if e.get("key")}
         t["@all"] = dump["elements"]
+        t["@view"] = dump["viewport"]
         t["@a11y"] = {}
         stack = [dump["accessibility"]]
         while stack:
@@ -132,8 +152,9 @@ def fits(t):
     """Every visible text lies inside the window on all four sides, as drawn at its real size. Today
     below its held top scrolls, so there a text need only fit the width; the day's strip scrolls
     sideways too, so its marks need not."""
+    vw, vh = t["@view"]
     return all(
-        x >= -0.5 and x + w <= 380.5 and ("/today-scroll/" in e["path"] or (y >= -0.5 and y + h <= 540.5))
+        x >= -0.5 and x + w <= vw + 0.5 and ("/today-scroll/" in e["path"] or (y >= -0.5 and y + h <= vh + 0.5))
         for e in t["@all"]
         if e.get("text") and ink(e) > 0.05 and e.get("rect") and "/day-strip-view/" not in e["path"]
         for x, y, w, h in [e["rect"]]
@@ -587,6 +608,65 @@ CHECKS = [
     ),
 ]
 
+
+def overlapping(elements):
+    """Pairs of visible texts drawn over one another, two copies of one key included."""
+    texts = [(e.get("text"), e["rect"]) for e in elements if e.get("text") and ink(e) > 0.05 and e.get("rect")]
+    hits = []
+    for i, (a, ra) in enumerate(texts):
+        for b, rb in texts[i + 1 :]:
+            if ra[0] < rb[0] + rb[2] and rb[0] < ra[0] + ra[2] and ra[1] < rb[1] + rb[3] and rb[1] < ra[1] + ra[3]:
+                hits.append((a, b))
+    return hits
+
+
+def inside(t, key):
+    """The element keyed `key` lies wholly inside the view."""
+    x, y, w, h = t[key]["rect"]
+    vw, vh = t["@view"]
+    return x >= -0.5 and y >= -0.5 and x + w <= vw + 0.5 and y + h <= vh + 0.5
+
+
+def clear(t):
+    """No two visible texts are drawn over one another, and the readout stays clear of the dock."""
+    readout, dock = t["readout"]["rect"], t["controls"]["rect"]
+    apart = readout[1] + readout[3] <= dock[1] or readout[0] + readout[2] <= dock[0]
+    return not overlapping(t["@all"]) and apart
+
+
+for script, size in SIZE.items():
+    CHECKS += [
+        (
+            f"at {size}{' with Larger Text' if 'larger' in script else ''}, the waiting block and its controls "
+            "fit, none over another",
+            script,
+            "waiting",
+            lambda t: fits(t) and inside(t, "controls") and clear(t) and text(t, "time") == "25:00",
+        ),
+        (
+            "Pause takes Start's place, and the running controls fit",
+            script,
+            "running",
+            lambda t: label(t, "control-play") == "Pause" and inside(t, "control-skip") and fits(t),
+        ),
+        ("the keys card fits", script, "keys", lambda t: inside(t, "keys") and "key-what-2" in t),
+        ("Today opens, and fits across", script, "today", lambda t: text(t, "today-title") == "Today" and fits(t)),
+        (
+            "and scrolls to the four weeks",
+            script,
+            "history",
+            lambda t: scrolls_to(t, "history") and t["history"]["rect"][1] < t["@view"][1] - 40,
+        ),
+    ]
+CHECKS.append(
+    (
+        "Larger Text grows the smallest window until the bigger words fit: 380 x 540 of its points",
+        "size-larger-small",
+        "grown",
+        lambda t: t["@view"] == [380.0, 540.0],
+    )
+)
+
 ONLY = set(sys.argv[1:])
 PROBES = {"pixels", "bell-light", "text-swap"}
 unknown = ONLY - {script for _, script, _, _ in CHECKS} - PROBES
@@ -675,17 +755,6 @@ for theme in ["light", "dark"] if wanted("bell-light") else []:
         "never below where the break settles  "
         f"(lowest {low:.4f}, settled {settled:.4f}, {'only darkening' if falls else 'brightens somewhere'})"
     )
-
-
-def overlapping(elements):
-    """Pairs of visible texts drawn over one another, two copies of one key included."""
-    texts = [(e.get("text"), e["rect"]) for e in elements if e.get("text") and ink(e) > 0.05 and e.get("rect")]
-    hits = []
-    for i, (a, ra) in enumerate(texts):
-        for b, rb in texts[i + 1 :]:
-            if ra[0] < rb[0] + rb[2] and rb[0] < ra[0] + ra[2] and ra[1] < rb[1] + rb[3] and rb[1] < ra[1] + ra[3]:
-                hits.append((a, b))
-    return hits
 
 
 if wanted("text-swap"):

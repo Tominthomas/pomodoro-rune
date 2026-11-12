@@ -43,5 +43,6 @@ Each feature file starts with an H1 title and one paragraph on the behavior a us
 - [Today and history](./today-history.md) covers Today's numbers, block detail, feelings, renaming and past days.
 - [Places](./places.md) covers Coast, Lake and Mesa by key and by menu.
 - [Menus](./menus.md) covers the Timer, View and Help menus in the menu bar.
+- [Window sizes and Larger Text](./window-sizes.md) covers resizing, Today's columns, Larger Text and narrow views.
 
 Not mapped yet, though `tools/check.py` covers them: the controls in sight while a block waits and receding once it runs (`hover`, `dock`), the activating click (`activate`, `activate-control`), the keys card (`keys`) and long labels (`long-label`).
