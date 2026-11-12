@@ -120,6 +120,9 @@ pub fn phase_line(s: &State) -> String {
         (Phase::Focus, Clock::Ringing { .. }) | (Phase::Short | Phase::Long, Clock::Wound) => cycle_line(t),
         _ if t.setting.is_some() => "release to set the length".into(),
         (_, Clock::Paused { .. }) => "the sky waits · space to resume".into(),
+        (Phase::Focus, Clock::Wound) if s.teaching() && s.sound => {
+            "The sun sets as you focus.\nWhen it's down, a bell rings.".into()
+        }
         (Phase::Focus, Clock::Wound) if s.teaching() => {
             "The sun sets as you focus.\nA finished block lights a lantern.".into()
         }

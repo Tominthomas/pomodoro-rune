@@ -8,7 +8,7 @@ fn space_starts_pauses_and_resumes_the_sunset() {
     let mut app = App::new();
     assert_eq!(
         (app.time(), app.phase()),
-        ("25:00".into(), "The sun sets as you focus.\nA finished block lights a lantern.".into())
+        ("25:00".into(), "The sun sets as you focus.\nWhen it's down, a bell rings.".into())
     );
     app.space();
     app.wait(2.0);

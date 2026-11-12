@@ -7,7 +7,7 @@ use rune::{MenuItem, Shortcut, Tx};
 use crate::controls::{press_words, skip_words};
 use crate::theme::PLACES;
 use crate::timer::Event;
-use crate::{Page, State, carry, open_today, set_always_time, set_larger, set_place};
+use crate::{Page, State, carry, open_today, set_always_time, set_larger, set_place, set_sound};
 
 /// One menu item as the state has it now. Its action is looked up by `id`.
 #[derive(Clone, PartialEq, Debug)]
@@ -55,6 +55,7 @@ pub fn items(s: &State) -> Vec<Item> {
     out.push(item("view-next-place", "View", "Next place", "t"));
     out.push(Item { checked: s.larger, gap: true, ..item("view-larger", "View", "Larger text", "cmd+=") });
     out.push(Item { checked: s.always_time, ..item("view-always-time", "View", "Always show time", "") });
+    out.push(Item { checked: s.sound, ..item("view-sound", "View", "Sound", "") });
     out.push(item("help-keys", "Help", "Keys", "slash"));
     out
 }
@@ -71,7 +72,8 @@ fn title_case(words: &str) -> String {
         .join(" ")
 }
 
-fn action(id: &str) -> fn(&mut State, &mut Tx) {
+/// What the item `id` does when it is picked.
+pub fn action(id: &str) -> fn(&mut State, &mut Tx) {
     match id {
         "timer-press" => |s, tx| carry(s, Event::Press { now: tx.clock() }, tx),
         "timer-skip" => |s, tx| carry(s, Event::Skip { now: tx.clock() }, tx),
@@ -80,6 +82,7 @@ fn action(id: &str) -> fn(&mut State, &mut Tx) {
         "view-next-place" => |s, tx| set_place(s, s.place + 1, tx),
         "view-larger" => |s, tx| set_larger(s, !s.larger, tx),
         "view-always-time" => |s, _| set_always_time(s, !s.always_time),
+        "view-sound" => |s, _| set_sound(s, !s.sound),
         "help-keys" => |s, _| s.keys_open = !s.keys_open,
         place => PLACE_IDS.iter().position(|p| *p == place).map_or(|_, _| {}, |i| PICK[i]),
     }

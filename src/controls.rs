@@ -221,8 +221,8 @@ fn pick_place(s: &mut State, tx: &mut Tx) {
     });
 }
 
-/// What the keys serve, said once above them: the cycle, and that the timer makes no sound.
-const ABOUT: &str = "A finished block lights a lantern, and four earn a long break. The timer makes no sound, so keep the sunset in sight.";
+/// What the keys serve, said once above them: the cycle, and the bell that calls you back.
+const ABOUT: &str = "A finished block lights a lantern, and four earn a long break. A soft bell rings when a block or a break ends. View › Sound turns it off.";
 
 /// Every key, grouped by what it is for: the timer, the block, and finding your way around.
 const KEYS: [(&str, &[(&str, &str)]); 3] = [

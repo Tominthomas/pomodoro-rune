@@ -3,6 +3,7 @@
 //! `cargo run --release` opens the window; `-- --snap out.png --scene focus-late` renders it
 //! headless.
 
+mod bell;
 mod controls;
 mod demo;
 mod drawing;
@@ -26,6 +27,7 @@ use rune::prefs::Prefs;
 use rune::time::{SystemTime, UNIX_EPOCH};
 use rune::{AppHandle, AppSpec, Cx, El, TextEdit, Transition, Tx, el};
 
+use bell::Bells;
 use lantern::Lantern;
 use log::{Block, Calendar, Day, Felt};
 use scene::{Dawn, Scene, Sky};
@@ -157,6 +159,9 @@ pub struct State {
     larger: bool,
     /// "Always show time" is on: the digits stay in sight while a focus block runs.
     always_time: bool,
+    /// Sound is on: the end of a block or a break rings a bell you hear, as well as see.
+    sound: bool,
+    sounds: Bells,
     /// The window's size in its own points, as the last view laid it out.
     window: Cell<(f32, f32)>,
     /// When the last break ended, on the window's clock, and the sky it ended in: the next
@@ -221,12 +226,14 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
     let larger = prefs.get::<bool>("larger-text").unwrap_or(false);
     let always_time = prefs.get::<bool>("always-show-time").unwrap_or(false);
+    let sound = prefs.get::<bool>("sound").unwrap_or(true);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.cue_marks, s.place, s.larger, s.always_time) = (hint, cue_marks, place, larger, always_time);
+    (s.hint, s.cue_marks, s.place, s.larger, s.always_time, s.sound) =
+        (hint, cue_marks, place, larger, always_time, sound);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -269,6 +276,8 @@ impl State {
             framed: false,
             larger: false,
             always_time: false,
+            sound: true,
+            sounds: Bells::new(),
             window: Cell::new((W, H)),
             dawn_from: None,
             took_up: scene::RISE,
@@ -450,8 +459,9 @@ pub fn guarded(f: impl Fn(&mut State, &mut Tx) + 'static) -> impl Fn(&mut State,
 }
 
 /// Steps the timer and carries its effects out: wakes become frame deadlines, a finished
-/// block goes into the record, a finished phase posts a notification when the window isn't in
-/// front. The cycle then follows the timer, and the record is saved once if anything changed.
+/// block goes into the record, a finished phase rings the bell (when Sound is on) and posts a
+/// notification when the window isn't in front. The cycle then follows the timer, and the record
+/// is saved once if anything changed.
 pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
     s.now = tx.clock();
     let rested = s.timer.progress(s.now);
@@ -460,6 +470,9 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
         match effect {
             Effect::WakeAt(at) => tx.wake_at(at),
             Effect::Rang(phase) => {
+                if s.sound {
+                    s.sounds.ring(phase);
+                }
                 notify(phase);
                 s.rang = Some(phase);
                 s.bells += 1;
@@ -575,6 +588,12 @@ fn set_larger(s: &mut State, on: bool, tx: &mut Tx) {
 fn set_always_time(s: &mut State, on: bool) {
     s.always_time = on;
     s.store.set("always-show-time", on);
+}
+
+/// Turns the bell's sound on or off. The ripples on the water ring either way.
+fn set_sound(s: &mut State, on: bool) {
+    s.sound = on;
+    s.store.set("sound", on);
 }
 
 fn set_place(s: &mut State, index: usize, tx: &mut Tx) {

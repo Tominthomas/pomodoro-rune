@@ -295,6 +295,7 @@ impl App {
     }
 }
 
+mod bell;
 mod digits;
 mod dock;
 mod ledger;
