@@ -6,6 +6,7 @@
 mod controls;
 mod demo;
 mod drawing;
+mod history;
 mod lantern;
 mod log;
 mod readout;
@@ -82,7 +83,7 @@ pub enum Asking {
 /// window must redraw without a frame between.
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct Timed {
-    controls: bool,
+    beckoned: bool,
     asking: Asking,
     day: Day,
 }
@@ -110,8 +111,6 @@ pub struct State {
     reflect: Option<Reflect>,
     /// The first-use hint for setting a block's length, until it's been used or put away.
     hint: bool,
-    /// Today's card explaining lanterns, rings and knots, until it's put away.
-    explain: bool,
     page: Page,
     /// The key overlay `?` opens.
     keys_open: bool,
@@ -142,6 +141,12 @@ pub struct State {
     store: Store,
     /// Why the last save failed or is slow, until one works again.
     save_error: Option<String>,
+    /// The phase whose bell rang last, until the next phase starts or the user moves on.
+    rang: Option<Phase>,
+    /// How many bells have rung, and how many of them a view has drawn as news: each is
+    /// announced once, as it happens, never again when the page or the key card changes.
+    bells: u32,
+    heard: Cell<u32>,
 }
 
 /// The first state, from what was saved. Headless runs keep their own settings and record in
@@ -154,7 +159,7 @@ fn init(handle: AppHandle<State>) -> State {
     } else {
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
     };
-    let cal = Calendar { fixed_offset: headless.then_some(0) };
+    let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
     restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()
@@ -174,13 +179,12 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let lengths: Lengths = prefs.get("lengths").unwrap_or_default();
     let saved_label = prefs.get::<String>("label").unwrap_or_default();
     let hint = !prefs.get::<bool>("hinted").unwrap_or(false) && study.log.blocks.is_empty();
-    let explain = !prefs.get::<bool>("explained").unwrap_or(false);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.explain, s.place) = (hint, explain, place);
+    (s.hint, s.place) = (hint, place);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -206,7 +210,6 @@ impl State {
             rename: TextEdit::new(String::new()),
             reflect: None,
             hint: false,
-            explain: false,
             page: Page::Scene,
             keys_open: false,
             place: 0,
@@ -224,6 +227,9 @@ impl State {
             reduced: Cell::new(false),
             store,
             save_error: None,
+            rang: None,
+            bells: 0,
+            heard: Cell::new(0),
         }
     }
 
@@ -246,10 +252,24 @@ impl State {
         (looks(water), looks(stars))
     }
 
-    /// Whether the controls show: while the pointer moves over the window or rests on them, or
-    /// after Tab.
+    /// Whether the controls show: always while a block or a break waits to start, so the first
+    /// thing to do is in sight, and once it runs, only while beckoned.
     fn controls_shown(&self) -> bool {
+        matches!(self.timer.clock, Clock::Wound | Clock::Scrubbing { .. }) || self.beckoned()
+    }
+
+    /// Whether the pointer or the keyboard has called the hover controls out: the pointer moves
+    /// over the window or rests on them, or Tab was pressed.
+    fn beckoned(&self) -> bool {
         self.keyboard || self.over_controls || self.controls_until > self.now
+    }
+
+    /// Whether the first-use hint is out: before the first block, until it is put away.
+    pub fn teaching(&self) -> bool {
+        self.hint
+            && self.study.log.blocks.is_empty()
+            && self.timer.phase == Phase::Focus
+            && self.timer.clock == Clock::Wound
     }
 
     /// What the reflection shows now: open from the bell until a word is given (then noted
@@ -270,12 +290,14 @@ impl State {
     }
 
     fn timed(&self) -> Timed {
-        Timed { controls: self.controls_shown(), asking: self.asking(), day: self.today() }
+        Timed { beckoned: self.beckoned(), asking: self.asking(), day: self.today() }
     }
 
-    /// The next moment `timed` can change by the clock alone, on the window's clock.
+    /// The next moment the window must wake by the clock alone, on the window's clock: when
+    /// `timed` can change, or the timer has a deadline.
     fn next_change(&self) -> f64 {
         let mut at = vec![self.cal.next_day(self.unix()) as f64 - self.epoch];
+        at.extend(self.timer.due());
         if self.controls_until > self.now {
             at.push(self.controls_until);
         }
@@ -349,7 +371,11 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
     for effect in s.timer.step(event) {
         match effect {
             Effect::WakeAt(at) => tx.wake_at(at),
-            Effect::Rang(phase) => notify(phase),
+            Effect::Rang(phase) => {
+                notify(phase);
+                s.rang = Some(phase);
+                s.bells += 1;
+            }
             Effect::Ended(ended) => {
                 let finished = ended.outcome == timer::Outcome::Finished;
                 let serial = s.study.record(ended, s.unix(), s.label());
@@ -369,6 +395,9 @@ pub fn carry(s: &mut State, event: Event, tx: &mut Tx) {
             }
             Effect::Advanced { .. } => {}
         }
+    }
+    if matches!(event, Event::Skip { .. } | Event::Undo { .. }) || matches!(s.timer.clock, Clock::Ticking { .. }) {
+        s.rang = None;
     }
     changed |= s.study.settle(&s.timer);
     if changed {
@@ -460,22 +489,21 @@ fn finish_label(s: &mut State, keep: bool, tx: &mut Tx) {
     tx.blur();
 }
 
-fn open_today(s: &mut State, open: bool) {
+/// Opens Today on today, its strip scrolled to the newest block, or goes back to the sunset.
+fn open_today(s: &mut State, open: bool, tx: &mut Tx) {
     s.page = if open { Page::Today(today::Nav::default()) } else { Page::Scene };
-}
-
-fn put_explanation_away(s: &mut State) {
-    s.explain = false;
-    s.store.set("explained", true);
+    if open {
+        tx.scroll_to_x(today::STRIP, f32::MAX);
+    }
 }
 
 /// Escape closes whatever is open, innermost first.
-fn escape(s: &mut State) -> bool {
+fn escape(s: &mut State, tx: &mut Tx) -> bool {
     if s.keys_open {
         s.keys_open = false;
     } else if let Page::Today(nav) = &mut s.page {
         if !nav.escape() {
-            open_today(s, false);
+            open_today(s, false, tx);
         }
     } else if s.asking() != Asking::Hidden {
         s.reflect = None;
@@ -490,7 +518,7 @@ fn escape(s: &mut State) -> bool {
 fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
     let now = tx.clock();
     if e.key == Key::Escape {
-        return escape(s);
+        return escape(s, tx);
     }
     if e.is_command('z') {
         carry(s, Event::Undo { now }, tx);
@@ -510,7 +538,7 @@ fn on_key(s: &mut State, e: &KeyEvent, tx: &mut Tx) -> bool {
             "s" => Event::Skip { now },
             "u" => Event::Undo { now },
             "h" => {
-                open_today(s, matches!(s.page, Page::Scene));
+                open_today(s, matches!(s.page, Page::Scene), tx);
                 return true;
             }
             "t" => {
@@ -571,6 +599,7 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
+    let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     let (water, stars) = s.lanterns();
     // Reduce Motion: a bell or a dawn shows only where it ends.
@@ -592,7 +621,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     };
     let root =
         el().size(W, H).clip_rounded(0.0).window_drag().on_pointer_move_local(|s: &mut State, _, tx: &mut Tx| {
-            let shown = s.controls_shown();
+            let shown = s.beckoned();
             s.keyboard = false;
             s.controls_until = tx.clock() + CONTROLS_LINGER;
             tx.wake_at(s.controls_until);
@@ -606,12 +635,20 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
             // break it rings in and every break opening into a dawn, so nothing cross-fades.
             let sky = el()
                 .key("sky")
+                .role("none")
                 .absolute(0.0, 0.0)
                 .size(W, H)
                 .on_drag(drag)
                 .child(scene::view(&scene).key("scene").absolute(0.0, 0.0));
             let k = theme::Ink::on(scene::ground(&scene));
-            root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k))
+            // The phase line already says it on the scene, so here the status is only heard.
+            let status =
+                readout::status(s, k, news).filter(|_| !s.keys_open).map(|e| e.opacity(1.0).color(k.text.alpha(0.0)));
+            let root = root.child(sky).child(readout::scrim(k)).child(readout::view(s, k)).child(controls::view(s, k));
+            match status {
+                Some(e) => root.child(e.absolute(24.0, H - 184.0)),
+                None => root,
+            }
         }
         Page::Today(nav) => {
             let day = nav.day(s.today());
@@ -624,16 +661,16 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
                 dark,
                 nav,
                 rename: &s.rename,
-                explain: s.explain,
+                status: readout::status(s, if dark { theme::Ink::light() } else { theme::Ink::dark() }, news)
+                    .filter(|_| !s.keys_open),
+                timer: &s.timer,
+                clock: s.now,
             };
-            // The page sits on the place's own sky: a golden afternoon in light mode, blue hour in dark.
-            let sky = if dark { Sky::BlueHour { progress: 0.4 } } else { Sky::Sunset { progress: 0.6, dawn: None } };
-            let evening = scene::view(&Scene { sky, water: &[], stars: &[], held: false, length: 25 * 60, ..scene });
-            root.child(today::backdrop(evening, Place::at(s.place), dark))
+            root.child(today::backdrop(Place::at(s.place), dark))
                 .child(today::view(&ledger).key("ledger").transition(Transition::blur_replace()))
         }
     };
-    if s.keys_open { page.child(controls::keys()) } else { page }
+    if s.keys_open { page.child(controls::keys(readout::status(s, theme::Ink::light(), news))) } else { page }
 }
 
 /// The window became the key window or stopped being it.

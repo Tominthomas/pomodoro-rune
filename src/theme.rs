@@ -1,6 +1,6 @@
 //! Themes are places. Each has its own sky, as six keyframes along the evening, its own land
 //! against the horizon and its own kind of water: an open swell, a still lake that mirrors its
-//! shore, a salt flat under a thin sheet of water. Nothing else in the app knows a colour.
+//! shore, a salt flat under a thin sheet of water.
 
 use rune::Color;
 use rune::color::srgb_decode;

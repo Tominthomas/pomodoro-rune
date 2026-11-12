@@ -1,0 +1,19 @@
+{
+ "events": [
+  {
+   "t": 0.3,
+   "type": "key",
+   "name": "Escape"
+  },
+  {
+   "t": 0.6,
+   "type": "key",
+   "name": "h"
+  },
+  {
+   "t": 1.6,
+   "type": "mark",
+   "name": "open"
+  }
+ ]
+}

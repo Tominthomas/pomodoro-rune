@@ -39,7 +39,7 @@ cargo run --release
 
 ## How a block goes
 
-A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space or click the sky to start. The sun sinks as the minutes run out.
+A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The sun sinks as the minutes run out.
 
 When the sun reaches the sea, ripples spread across the water and a lantern lights. The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
 
@@ -52,18 +52,18 @@ A five-minute break waits next. Press Space or click the sky to start it. After 
 
 <p align="center">Left: the end of a focus block. Right: a one-minute demo break played at 3x speed. Normal long breaks default to fifteen minutes.</p>
 
-Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you stop early ("let go"), the minutes you kept show as a ring instead of a lantern, and you can undo it for nine seconds.
+Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you stop early ("let go"), the minutes you kept show as a ring instead of a lantern, and you can undo it until you start the break or the next block.
 
 ## Keys
 
-Press `?` in the app to see these. The controls also appear in the bottom right when you move the pointer.
+Press `?` in the app to see these. Every control is also a button VoiceOver can find and press.
 
 | Key | What it does |
 | --- | --- |
 | `Space` | Start, pause, or resume |
 | `↑` `↓` | One minute longer or shorter, while the timer waits (`→` and `←` work too) |
 | `S` | Let go of a block, or skip a break |
-| `U` or `⌘Z` | Undo a let go, for nine seconds |
+| `U` or `⌘Z` | Undo a let go, until you start again |
 | `L` | Name the next block |
 | `1` `2` `3` | How the block felt: deep, steady, or drifting |
 | `H` | Today and the last four weeks |

@@ -31,9 +31,17 @@ FPS = {
     "drag": "60",
     "today": "60",
     "bell": "60",
+    "four-labels": "60",
+    "busy-day": "30",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
-SCENE = {"today": "today", "bell": "last-minute", "night": "night-minute"}
+SCENE = {
+    "today": "today",
+    "bell": "last-minute",
+    "night": "night-minute",
+    "four-labels": "today",
+    "busy-day": "busy",
+}
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
 # inherits. src/tests.rs holds the same floor.
@@ -58,12 +66,14 @@ def run(script, at, out_flag, out, extra=()):
 
 
 def tree(script, at):
-    """The keyed elements at a mark, and under "@a11y" the accessibility nodes by key."""
+    """The keyed elements at a mark; under "@all" every element, keyed or not; and under "@a11y"
+    the accessibility nodes by key."""
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "tree.json"
         run(script, at, "--tree", out, ["--fps", FPS.get(script, "10"), "--scale", "1"])
         dump = json.loads(out.read_text())
         t = {e["key"]: e for e in dump["elements"] if e.get("key")}
+        t["@all"] = dump["elements"]
         t["@a11y"] = {}
         stack = [dump["accessibility"]]
         while stack:
@@ -115,13 +125,34 @@ def phase(t):
 
 
 def fits(t):
-    """Every visible text lies inside the window on all four sides, as drawn at its real size."""
+    """Every visible text lies inside the window on all four sides, as drawn at its real size. Today
+    below its held top scrolls, so there a text need only fit the width; the day's strip scrolls
+    sideways too, so its marks need not."""
     return all(
-        x >= -0.5 and y >= -0.5 and x + w <= 380.5 and y + h <= 540.5
-        for k, e in t.items()
-        if k != "@a11y" and e.get("text") and ink(e) > 0.05 and e.get("rect")
+        x >= -0.5 and x + w <= 380.5 and ("/today-scroll/" in e["path"] or (y >= -0.5 and y + h <= 540.5))
+        for e in t["@all"]
+        if e.get("text") and ink(e) > 0.05 and e.get("rect") and "/day-strip-view/" not in e["path"]
         for x, y, w, h in [e["rect"]]
     )
+
+
+def held(t):
+    """Today's timer, title and way back are where they belong whatever scrolls under them."""
+    return all(
+        t[k]["rect"][1] >= 0 and t[k]["rect"][1] + t[k]["rect"][3] <= 130
+        for k in ("timer-bar", "today-title", "today-close")
+    )
+
+
+def scrolls_to(t, key):
+    """The element keyed `key` is in the part of Today that scrolls."""
+    return "/today-scroll/" in t.get(key, {}).get("path", "")
+
+
+def apart(rects):
+    """No two of these boxes overlap side to side."""
+    rects = sorted(rects)
+    return all(a[0] + a[2] <= b[0] + 0.5 for a, b in pairwise(rects))
 
 
 def right_edge(t, key):
@@ -150,17 +181,37 @@ CHECKS = [
         "Space pauses it where it was",
         "start",
         "paused",
-        lambda t: text(t, "time") == "24:58" and phase(t) == "paused · space to resume",
+        lambda t: text(t, "time") == "24:58" and phase(t) == "the sky waits · space to resume",
     ),
     ("a tap goes on from there", "start", "resumed", lambda t: text(t, "time") == "24:57" and phase(t) == "focus"),
     (
         "VoiceOver reads the time left, not just its name",
         "start",
         "running",
-        lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time left",
+        lambda t: spoken(t, "time") == "24 minutes 58 seconds" and t["@a11y"]["time"].get("name") == "Time remaining",
     ),
-    ("the hover controls show while the pointer moves", "hover", "shown", lambda t: opacity(t, "controls") == 1.0),
-    ("and fade once it rests, even with the clock stopped", "hover", "rested", lambda t: opacity(t, "controls") == 0.0),
+    (
+        "while a block waits, the controls stay out and Start focus says what it does",
+        "hover",
+        "waiting",
+        lambda t: (
+            opacity(t, "control-play-look") == 1.0
+            and t["@a11y"].get("control-play", {}).get("name") == "Start focus"
+            and opacity(t, "control-today-look") == 1.0
+        ),
+    ),
+    (
+        "once it runs they come out while the pointer moves",
+        "hover",
+        "shown",
+        lambda t: opacity(t, "control-play-look") == 1.0,
+    ),
+    (
+        "and fade once it rests, staying where VoiceOver finds them",
+        "hover",
+        "rested",
+        lambda t: opacity(t, "control-play-look") == 0.0 and t["@a11y"].get("control-play", {}).get("name") == "Pause",
+    ),
     (
         "a label is typed without starting the clock, and arrows set one minute",
         "cycle",
@@ -176,7 +227,12 @@ CHECKS = [
         "the bell lights a lantern for the block",
         "cycle",
         "b1-bell",
-        lambda t: phase(t) == "a lantern for that one" and text(t, "time") == "1 min" and lanterns(t) == ["lantern-0"],
+        lambda t: (
+            phase(t) == "a lantern for that one"
+            and (text(t, "time"), text(t, "time-unit")) == ("1 min", "focused")
+            and (t["@a11y"]["time"].get("name"), spoken(t, "time")) == ("Block complete", "1 minute focused")
+            and lanterns(t) == ["lantern-0"]
+        ),
     ),
     (
         "then a short break waits, offering three words",
@@ -190,7 +246,7 @@ CHECKS = [
         "wound-2",
         lambda t: text(t, "top-text") == "Reading & notes" and phase(t) == "focus · space to begin",
     ),
-    ("a second block pauses", "cycle", "b2-paused", lambda t: phase(t) == "paused · space to resume"),
+    ("a second block pauses", "cycle", "b2-paused", lambda t: phase(t) == "the sky waits · space to resume"),
     (
         "and still lights a lantern, with a knot for the pause",
         "cycle",
@@ -264,7 +320,7 @@ CHECKS = [
         "cycle",
         "today",
         lambda t: (
-            text(t, "reflected") == "you said how 1 of 4 felt"
+            label(t, "felt-said") == "How the blocks felt: 1 deep, 3 not marked"
             and "felt-part-steady" not in t
             and "felt-part-drifting" not in t
         ),
@@ -301,14 +357,19 @@ CHECKS = [
         "reflect",
         "today",
         lambda t: (
-            text(t, "reflected") == "you said how 1 of 2 felt" and "feeling not given" in label(t, "day-lantern-1")
+            label(t, "felt-said") == "How the blocks felt: 1 steady, 1 not marked"
+            and "feeling not given" in label(t, "day-lantern-1")
         ),
     ),
     (
         "a block let go can be undone for a moment",
         "undo",
         "letgo",
-        lambda t: "undo" in t and phase(t) == "let go; the minutes still count",
+        lambda t: (
+            "undo" in t
+            and phase(t) == "let go; the minutes still count"
+            and (text(t, "time"), text(t, "time-unit")) == ("under a minute", "kept")
+        ),
     ),
     (
         "undo puts the block back, running",
@@ -326,7 +387,7 @@ CHECKS = [
         "the click that brings the window forward starts nothing",
         "activate",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
     ),
     (
         "the next click starts the sunset",
@@ -335,24 +396,29 @@ CHECKS = [
         lambda t: phase(t) == "focus" and text(t, "time") != "25:00",
     ),
     (
-        "the activating click on a hover control does nothing either",
+        "the activating click on a control does nothing either",
         "activate-control",
         "activated",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
-    ("the controls stay while the pointer rests on them", "dock", "resting", lambda t: opacity(t, "controls") == 1.0),
+    (
+        "the controls stay while the pointer rests on them",
+        "dock",
+        "resting",
+        lambda t: opacity(t, "control-play-look") == 1.0,
+    ),
     (
         "a click in their corner, off any control, never reaches the sky",
         "dock",
         "corner-click",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: phase(t) == "focus",
     ),
     (
         "nor does a click where a control has faded",
         "dock",
         "faded-click",
-        lambda t: text(t, "time") == "25:00" and phase(t) == "focus · space to begin",
+        lambda t: phase(t) == "focus",
     ),
     (
         "letting go of the sun sets a shorter block and starts nothing",
@@ -376,12 +442,35 @@ CHECKS = [
         ),
     ),
     (
-        "Today fits the window with a block open, History's legend included",
+        "Today holds its timer and title with a block open, and History's legend scrolls up under them",
         "today",
         "felt-given",
-        lambda t: fits(t) and t["history-scale"]["rect"][1] + t["history-scale"]["rect"][3] <= 540,
+        lambda t: fits(t) and held(t) and scrolls_to(t, "history-scale"),
     ),
-    ("and with a day's explanation showing", "cycle", "today", lambda t: fits(t) and "explain" in t),
+    (
+        "four long names keep inside the width, and the page still scrolls to the legend",
+        "four-labels",
+        "view",
+        lambda t: (
+            fits(t)
+            and held(t)
+            and "for-name-Calculus practice problems" in t
+            and scrolls_to(t, "history-scale")
+            and t["today-scroll"]["rect"][1] + t["today-scroll"]["rect"][3] <= 540.5
+        ),
+    ),
+    (
+        "a day of nineteen blocks keeps every mark's target apart, opening on the newest",
+        "busy-day",
+        "open",
+        lambda t: (
+            len(lanterns(t, "day-lantern-")) + len(lanterns(t, "day-ring-")) == 19
+            and apart([t[k]["rect"] for k in lanterns(t, "day-lantern-") + lanterns(t, "day-ring-")])
+            and t["day-lantern-14"]["rect"][0] + 24 <= t["day-strip-view"]["rect"][0] + t["day-strip-view"]["rect"][2]
+            and t["day-lantern-14"]["rect"][0] >= t["day-strip-view"]["rect"][0]
+        ),
+    ),
+    ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
     ("half a minute out, the sun's lower limb is still above the sea", "bell", "half", lambda t: sun_bottom(t) < 329.0),
     ("at 00:00 it touches the water", "bell", "zero", lambda t: abs(sun_bottom(t) - 330.0) < 0.6),
@@ -389,7 +478,7 @@ CHECKS = [
         "a click on Today's background leaves it open",
         "today",
         "clicked",
-        lambda t: text(t, "today-title") == "Today" and ("strip-note" in t or "explain" in t),
+        lambda t: text(t, "today-title") == "Today" and ("strip-note" in t or "strip-key" in t),
     ),
     (
         "a lantern in Today opens its block on two lines, clear of its close button",
@@ -453,7 +542,8 @@ if wanted("pixels"):
     paused = pixels("lantern-paused", "end", "day-lantern-art-0")
     same = int((plain != again).any(axis=1).sum())
     differ = int((plain != paused).any(axis=1).sum())
-    good = same == 0 and differ > 40
+    # One knot is a dot of 1.3 points, about 21 pixels at 2x; Today's page under it is still.
+    good = same == 0 and differ > 15
     failed += not good
     print(
         f"{'pass' if good else 'FAIL'}  a paused block's lantern looks different; the same lantern renders the same  "

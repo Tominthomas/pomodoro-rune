@@ -1,6 +1,6 @@
 # Let go and undo
 
-During a focus block, `S` or the `let go` control ends the block early. It lights no lantern and its minutes still count, shown as a ring in Today. For nine seconds an `Undo let go` button can bring the block back, still running, and it then counts as one block. During a break the same key and control skip to the next block.
+During a focus block, `S` or the `let go` control ends the block early. It lights no lantern and its minutes still count, shown as a ring in Today. Until the break or the next block starts, an `Undo let go` button (on the scene, and as `timer-undo` in Today) can bring the block back, still running, and it then counts as one block. During a break the same key and control skip to the next block.
 
 ## Sub-features
 
@@ -14,7 +14,7 @@ During a focus block, `S` or the `let go` control ends the block early. It light
 
 - Press `S` while a focus block runs or is paused.
 - Show the controls, then click `let go`. It appears only while a block runs or is paused.
-- Press `U` or ⌘Z, or click `Undo let go`, within nine seconds.
+- Press `U` or ⌘Z, or click `Undo let go`, before you start the break or the next block.
 - During a break, press `S` or click `Skip break`.
 
 ## Driving it with the headless renderer
@@ -40,6 +40,6 @@ Preconditions:
 
 - The next PR renames this to Skip. Afterwards the copy, the ring label, the phase line and the control's text change. Update this file and `tools/check.py` in that PR.
 - `time` reads `under a minute` while VoiceOver says `0 seconds` during the let-go ring (seen at `undo.json` mark `letgo`). Assert each one separately.
-- The undo button disappears after nine seconds of window clock. A mark more than nine seconds after `S` sees no `undo`.
-- `control-skip` exists only while the controls show. Move the pointer over the window or press Tab first, or the tap lands on an inert control and does nothing.
+- The undo button stays until a phase starts, however long that takes. A mark after Space starts the break sees no `undo`.
+- `control-skip` is always in the accessibility tree while a block runs, but its look is hidden until the controls show. Move the pointer over the window or press Tab first, or the tap lands on `dock-cover` and does nothing.
 - During the bell's ring after a finished block there is no `control-skip` at all.

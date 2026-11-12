@@ -21,9 +21,9 @@ Preconditions:
 
 - The baseline from `README.md`. Use `--fps 60` for `start.json`, because its digits are checked to the second.
 
-- **Pause.** Tap the sky, then press Space at 2.5 s. Run `look scripts/start.json --at mark:paused time phase resume control-play --out $RUN/paused`. `time` reads `24:58`, `phase` reads `paused · space to resume`, `resume` is drawn, and `control-play` is labelled `Resume`.
+- **Pause.** Tap the sky, then press Space at 2.5 s. Run `look scripts/start.json --at mark:paused time phase resume control-play --out $RUN/paused`. `time` reads `24:58`, `phase` reads `the sky waits · space to resume`, `resume` is drawn, and `control-play` is labelled `Resume`.
 - **Resume.** Tap the sky at 3.6 s. Run `look scripts/start.json --at mark:resumed time phase --out $RUN/resumed`. `time` reads `24:57` and `phase` reads `focus`.
-- **Pause inside a cycle.** Run `look scripts/cycle.json --at mark:b2-paused --fps 10 phase`. `phase` reads `paused · space to resume`.
+- **Pause inside a cycle.** Run `look scripts/cycle.json --at mark:b2-paused --fps 10 phase`. `phase` reads `the sky waits · space to resume`.
 - **Knot on the lantern.** Run `look scripts/cycle.json --at mark:b2-break --fps 10 lantern-1`. `lantern-1` is labelled `Lantern 2, paused once`.
 - **Knot as drawn.** Run `python3 tools/check.py pixels`. It passes when more than 40 pixels of `day-lantern-art-0` differ between `lantern-plain` and `lantern-paused`, and none differ between two plain renders.
 - **Proof.** Run `python3 tools/check.py start cycle pixels | tee $RUN/check.txt` and `app --script scripts/start.json --video $RUN/pause.mp4 --fps 30 --keys --pointer`.

@@ -1,18 +1,28 @@
 {
  "events": [
   {
-   "t": 0.3,
+   "t": 0.2,
+   "type": "mark",
+   "name": "waiting"
+  },
+  {
+   "t": 0.4,
+   "type": "key",
+   "name": " "
+  },
+  {
+   "t": 0.6,
    "type": "move",
    "x": 200.0,
    "y": 300.0
   },
   {
-   "t": 1.0,
+   "t": 1.4,
    "type": "mark",
    "name": "shown"
   },
   {
-   "t": 4.0,
+   "t": 4.6,
    "type": "mark",
    "name": "rested"
   }
