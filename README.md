@@ -63,6 +63,10 @@ A five-minute break waits next. Press Space or click the sky to start it. After 
 
 Pausing is fine. A pause ties a small knot on the lantern's cord, and the block still counts. If you skip a block, it ends early: the minutes you kept still count and show as a ring instead of a lantern. You can undo a skip until you start the break or the next block.
 
+## The sun in the menu bar
+
+You can close the window and the block keeps going. A small sun sits in the menu bar by the clock, a little lower as the block goes on, with the minutes left beside it in whole minutes. It turns hollow while you pause, becomes a lantern for a short break and a moon for the long one. Click it for a menu to start, pause or skip, see today's total, turn the sound off or open the window again. Clicking the Dock icon opens the window too. To quit, press `⌘Q` or pick Quit from the sun's menu.
+
 ## Keys
 
 Press `?` in the app to see these. The Timer, View and Help menus in the menu bar list the same actions. Every control is also a button VoiceOver can find and press.

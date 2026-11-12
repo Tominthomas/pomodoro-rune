@@ -19,6 +19,7 @@ mod study;
 mod theme;
 mod timer;
 mod today;
+mod tray;
 
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
@@ -183,9 +184,14 @@ pub struct State {
     /// announced once, as it happens, never again when the page or the key card changes.
     bells: u32,
     heard: Cell<u32>,
-    /// The menu bar, and the items it was last given. A test has none.
-    menu_bar: Option<AppHandle<State>>,
+    /// The running app, for its menu bar and its window, and the items the menu bar was last
+    /// given. A test has none.
+    app: Option<AppHandle<State>>,
     menu_shown: RefCell<Vec<menu::Item>>,
+    /// The sun in the menu bar. Tests and headless runs have none.
+    tray: Option<tray::Tray>,
+    /// The first close has said the sun is in the menu bar now.
+    told_tray: bool,
 }
 
 /// The first state, from what was saved. Headless runs keep their own settings and record in
@@ -199,7 +205,7 @@ fn init(handle: AppHandle<State>) -> State {
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
     };
     let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
-    let menu_bar = handle.clone();
+    let app = handle.clone();
     let mut s = restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()
@@ -207,7 +213,7 @@ fn init(handle: AppHandle<State>) -> State {
             Store::open(prefs, move |e| handle.update(move |s: &mut State, _| s.save_error = e))
         }
     });
-    s.menu_bar = Some(menu_bar);
+    s.app = Some(app);
     // A headless run has no window to remember.
     s.framed = headless;
     s
@@ -226,14 +232,15 @@ fn restore(prefs: Prefs, epoch: f64, cal: Calendar, open: impl FnOnce(Prefs) -> 
     let cue_marks = !prefs.get::<bool>("opened-block").unwrap_or(false);
     let larger = prefs.get::<bool>("larger-text").unwrap_or(false);
     let always_time = prefs.get::<bool>("always-show-time").unwrap_or(false);
+    let told_tray = prefs.get::<bool>("told-tray").unwrap_or(false);
     let sound = prefs.get::<bool>("sound").unwrap_or(true);
     let legacy: Vec<&str> = study::LEGACY.iter().copied().filter(|k| prefs.contains(k)).collect();
     let timer = study.resume(cal, now, lengths);
     let mut s = State::new(epoch, cal, study, timer, open(prefs));
     s.label = TextEdit::new(saved_label.clone());
     s.saved_label = saved_label;
-    (s.hint, s.cue_marks, s.place, s.larger, s.always_time, s.sound) =
-        (hint, cue_marks, place, larger, always_time, sound);
+    (s.hint, s.cue_marks, s.place, s.larger, s.always_time, s.sound, s.told_tray) =
+        (hint, cue_marks, place, larger, always_time, sound, told_tray);
     // The new key is written before the old ones go, so a crash between finds it and ignores them.
     if rewrite {
         s.save();
@@ -288,8 +295,10 @@ impl State {
             rang: None,
             bells: 0,
             heard: Cell::new(0),
-            menu_bar: None,
+            app: None,
             menu_shown: RefCell::new(Vec::new()),
+            tray: None,
+            told_tray: false,
         }
     }
 
@@ -522,10 +531,37 @@ fn notify(finished: Phase) {
     rune_mac::notify::post(&rune_mac::notify::Notification::new("phase", title).body(body));
 }
 
+/// Waits a little for the last save, as the window closes or the app quits from the menu bar
+/// with the window already closed.
+fn flush(s: &State) {
+    if let Err(why) = s.store.flush(CLOSE_WAIT) {
+        eprintln!("pomodoro: closing with the last save not written: {why}");
+    }
+}
+
+/// The first time the window closes, says once where the block went: closing hides the window,
+/// and the sun in the menu bar keeps the time. It waits for a close that can say it.
+fn tell_tray(s: &mut State) {
+    if s.told_tray || s.tray.is_none() || !rune_mac::notify::available() {
+        return;
+    }
+    rune_mac::notify::post(
+        &rune_mac::notify::Notification::new("tray", "The sun's in the menu bar now")
+            .body("Pomodoro keeps the time up there while the window is closed. Click the sun to open it again."),
+    );
+    s.told_tray = true;
+    s.store.set("told-tray", true);
+}
+
 fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
     s.now = now;
     if !s.framed {
         s.framed = rune_mac::remember_frame(FRAME);
+        // The sun's status item is a window too, and `remember_frame` names every window it finds,
+        // so the sun goes up only once the app's window holds the name.
+        if s.framed {
+            s.tray = s.app.clone().and_then(tray::Tray::new);
+        }
     }
     let mut changed = false;
     if let Some(timer) = s.study.roll_over(s.cal, s.unix(), &s.timer) {
@@ -541,8 +577,9 @@ fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
         changed = true;
     }
     tx.wake_at(s.next_change());
-    // A bell can ring with the window hidden, where no view runs; the menu still follows it.
+    // A bell can ring with the window hidden, where no view runs; the menus still follow it.
     menu::sync(s);
+    tray::sync(s);
     if let Some(fps) = s.motion() {
         if now >= s.next_frame {
             s.drift += (1.0 / fps) as f32;
@@ -636,6 +673,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
     menu::sync(s);
+    tray::sync(s);
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     // The window as the last layout found it; before the first, the size it opens at.
@@ -761,11 +799,14 @@ fn main() {
     app.init(move || init(handle))
         .on_visibility(|s: &mut State, shown, _| s.visible = shown)
         .on_focus(on_focus)
+        .keep_running()
         .on_close(|s: &mut State, _| {
-            if let Err(why) = s.store.flush(CLOSE_WAIT) {
-                eprintln!("pomodoro: closing with the last save not written: {why}");
+            if !rune::quitting() {
+                tell_tray(s);
             }
+            flush(s);
         })
+        .on_quit(|s: &mut State, _| flush(s))
         .run();
 }
 

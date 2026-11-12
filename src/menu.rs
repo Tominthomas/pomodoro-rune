@@ -61,7 +61,7 @@ pub fn items(s: &State) -> Vec<Item> {
 }
 
 /// "Skip this block" as a menu says it: "Skip This Block".
-fn title_case(words: &str) -> String {
+pub fn title_case(words: &str) -> String {
     words
         .split(' ')
         .map(|w| {
@@ -91,7 +91,7 @@ pub fn action(id: &str) -> fn(&mut State, &mut Tx) {
 /// Hands the menu bar the items the state calls for, when they changed since it was last told.
 /// Tests run without a menu bar, and so without a handle.
 pub fn sync(s: &State) {
-    let Some(handle) = &s.menu_bar else { return };
+    let Some(handle) = &s.app else { return };
     let now = items(s);
     if *s.menu_shown.borrow() == now {
         return;

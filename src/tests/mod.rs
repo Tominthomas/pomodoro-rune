@@ -300,4 +300,5 @@ mod digits;
 mod dock;
 mod ledger;
 mod sunset;
+mod tray;
 mod window;
