@@ -39,6 +39,7 @@ FPS = {
     "today-label": "60",
     "menus": "30",
     "history-larger-small": "60",
+    "sound": "30",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
 SCENE = {
@@ -457,7 +458,7 @@ CHECKS = [
         "activate",
         "activated",
         lambda t: (
-            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nWhen it's down, a bell rings."
         ),
     ),
     (
@@ -471,7 +472,7 @@ CHECKS = [
         "activate-control",
         "activated",
         lambda t: (
-            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nA finished block lights a lantern."
+            text(t, "time") == "25:00" and phase(t) == "The sun sets as you focus.\nWhen it's down, a bell rings."
         ),
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
@@ -617,10 +618,22 @@ CHECKS = [
         lambda t: label(t, "control-place") == "Place: Coast" and label(t, "keys") == "Keys",
     ),
     (
-        "and says what the lanterns earn and that the timer is silent",
+        "the View menu's Sound turns the bell off, and the first hint stops promising one",
+        "sound",
+        "off",
+        lambda t: phase(t) == "The sun sets as you focus.\nA finished block lights a lantern.",
+    ),
+    (
+        "and on again",
+        "sound",
+        "on",
+        lambda t: phase(t) == "The sun sets as you focus.\nWhen it's down, a bell rings.",
+    ),
+    (
+        "and says what the lanterns earn and that a bell rings, which the View menu turns off",
         "keys",
         "open",
-        lambda t: "four earn a long break" in text(t, "keys-about") and "no sound" in text(t, "keys-about"),
+        lambda t: "four earn a long break" in text(t, "keys-about") and "Sound turns it off" in text(t, "keys-about"),
     ),
     ("half a minute out, the sun's lower limb is still above the sea", "bell", "half", lambda t: sun_bottom(t) < 329.0),
     ("at 00:00 it touches the water", "bell", "zero", lambda t: abs(sun_bottom(t) - 330.0) < 0.6),

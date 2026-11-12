@@ -74,6 +74,7 @@ Headless can't show these. Verify them in the real window or list them as unveri
 - The place menu and the menu bar as macOS draws them. Headless `menu-pick` and `menu` events prove the choice lands, not how the menu looks.
 - The click that brings an inactive window forward. Headless fakes it with `{"focus":false}` then `{"focus":true}`, but the real activation timing isn't covered.
 - The last save being flushed to `prefs.json` on quit, and the saved file read back on the next launch.
+- The bell's sound. Headless never plays it. `src/tests/bell.rs` proves when it is played, not that the speakers sound it.
 - Notifications posted when the window isn't in front. They need an app bundle.
 - Window chrome, dragging the window, live resizing with the pointer, the frame remembered across launches (`rune_mac::remember_frame`), the Dock icon and the app icon. Headless `--size` proves each size's layout, not the drag between them.
 - Following the system appearance live. Headless takes `--theme` once.
@@ -85,6 +86,7 @@ The agent shell here runs in Tomin's Aqua login session (`launchctl managername`
 3. Click the place control and pick Lake from the menu. The scene changes.
 4. Click another app, then click the sky once. Nothing starts. Click again and the sunset starts.
 5. Press S, then quit with ⌘Q before starting the break. Relaunch. Today shows a ring for the block.
-6. With another app in front, let a one-minute block reach its bell. A notification arrives (bundle only).
+6. With another app in front, let a one-minute block reach its bell. A soft, low bell sounds once, and a notification arrives (bundle only). Start the break and let it end: a lighter, higher bell sounds once.
+7. Untick View > Sound and run another one-minute block. The lantern lights and nothing sounds.
 
 The permission-gated path is untested, and every step of it is unproven. Rune's installer is pinned to the app's Rune revision at `~/.cargo/git/checkouts/rune-c9b805e9ed8a3730/bb310fc/scripts/mac-app`. `tools/bundle.sh` builds and signs `target/Pomodoro.app` without launching it, and its static checks (signature, `Info.plist`, icon) need no permission. `mac-app --name Pomodoro --id dev.tomin.pomodoro --exe pomodoro --bundle target/Pomodoro.app --no-rune-ready` installs that bundle to `~/Applications/Pomodoro.app` and launches it. That launch uses the real prefs. Find the window's CGWindowID (no tool for that is installed here yet), capture it with `screencapture -l <windowid> "$RUN/window.png"`, and send input with System Events. All of that needs Tomin to grant Screen Recording and Accessibility to the T3 service. Before relying on any of it, run it once end to end and update this section.

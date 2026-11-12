@@ -38,5 +38,5 @@ Preconditions:
 - `cycle.json` is five minutes of virtual time. At `--fps 60` it takes far longer to render and gives the same answers, so use `--fps 10`.
 - `top-text` is always in the tree. Before a block is named it reads `+ name this block`, drawn while the block waits and at ink 0 once it runs. Check `ink`, not presence.
 - `1`, `2` and `3` only rate while the question is open. Pressed at other times they do nothing, and a test that presses them early still passes on presence alone.
-- The bell is silent by design. There is no sound to verify.
+- The bell sounds once at the end of a block (low) and of a break (lighter, higher), unless View > Sound is off. Headless runs never play sound. `cargo test --release tests::bell` reads Rune's silent players, which keep time with the window's clock, and `python3 tools/check.py sound` covers the menu item. Hearing it is a real-window check.
 - A notification at the bell is only posted when the window isn't in front and the app runs as a bundle. Headless can't show it. See SKILL.md's "Real window".

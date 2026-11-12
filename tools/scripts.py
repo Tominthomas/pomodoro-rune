@@ -323,6 +323,8 @@ SCRIPTS = {
         {"t": 5.0, "menu": "help-keys"},
         mark(5.4, "keys"),
     ],
+    # The bell's sound, off and on again from the View menu, seen in the first-use hint.
+    "sound": [{"t": 0.3, "menu": "view-sound"}, mark(1.0, "off"), {"t": 1.2, "menu": "view-sound"}, mark(2.0, "on")],
     "size-tall": sized(),
     "size-wide": sized(),
     "size-larger": sized(larger=True),
