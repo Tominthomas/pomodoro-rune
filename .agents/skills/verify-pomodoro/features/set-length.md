@@ -42,6 +42,7 @@ Preconditions:
   ```
 
 - **Arrows ignored while running.** Run `cargo test --release the_arrows_set_the_length_only_while_the_block_waits`. It passes.
+- **Arrows ignored over Today and the keys card.** Run `cargo test --release the_arrows_leave_the_length_alone_while_today_or_the_keys_are_open`. It passes.
 - **Proof.** Run `python3 tools/check.py drag cycle | tee $RUN/check.txt` and `app --script scripts/drag.json --video $RUN/drag.mp4 --fps 30 --pointer`.
 
 ## Gotchas
