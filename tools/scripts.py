@@ -251,6 +251,24 @@ SCRIPTS = {
     "busy-day": [key(0.3, "Escape"), key(0.6, "h"), mark(1.6, "open")],
     # Every key on one card.
     "keys": [key(0.2, "?"), mark(1.0, "open")],
+    # Every menu item, picked from the menu bar rather than pressed: the timer's, Today, a place
+    # and the keys.
+    "menus": [
+        {"t": 0.3, "menu": "timer-press"},
+        mark(2.0, "running"),
+        {"t": 2.2, "menu": "timer-skip"},
+        mark(2.6, "skipped"),
+        {"t": 2.8, "menu": "timer-undo"},
+        mark(3.2, "undone"),
+        {"t": 3.4, "menu": "view-today"},
+        mark(3.8, "today"),
+        {"t": 4.0, "menu": "place-2"},
+        {"t": 4.2, "menu": "view-today"},
+        mark(4.6, "mesa"),
+        {"t": 4.8, "menu": "view-next-place"},
+        {"t": 5.0, "menu": "help-keys"},
+        mark(5.4, "keys"),
+    ],
     # A label longer than the window has room for.
     "long-label": [*label(0.1, "Thermodynamics problem set, chapter seven, the long derivations"), mark(4.5, "end")],
 }

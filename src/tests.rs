@@ -480,6 +480,37 @@ fn todays_marks_say_they_open_their_block_and_the_cue_goes_once_one_is_opened() 
 }
 
 #[test]
+fn the_menus_name_what_each_key_does_now_and_dim_what_would_do_nothing() {
+    let mut app = App::new();
+    let menu = |app: &App| -> Vec<(String, bool, bool)> {
+        menu::items(&app.rt.state).into_iter().map(|i| (i.title, i.enabled, i.checked)).collect()
+    };
+    let item = |app: &App, id: &str| {
+        let i = menu::items(&app.rt.state).into_iter().find(|i| i.id == id).unwrap();
+        (i.title, i.enabled, i.checked)
+    };
+    let titles: Vec<String> = menu(&app).into_iter().map(|i| i.0).collect();
+    assert_eq!(titles, ["Start Focus", "Skip", "Undo Skip", "Today", "Coast", "Lake", "Mesa", "Next Place", "Keys"]);
+    assert_eq!(
+        (item(&app, "timer-skip"), item(&app, "timer-undo")),
+        (("Skip".into(), false, false), ("Undo Skip".into(), false, false)),
+        "nothing to skip or undo yet"
+    );
+    assert_eq!(item(&app, "place-0"), ("Coast".into(), true, true), "the place shown is ticked");
+    app.space();
+    assert_eq!(
+        (item(&app, "timer-press").0, item(&app, "timer-skip")),
+        ("Pause".into(), ("Skip This Block".into(), true, false))
+    );
+    app.char("s");
+    assert_eq!((item(&app, "timer-press").0, item(&app, "timer-undo").1), ("Start Break".into(), true));
+    app.char("h");
+    assert!(item(&app, "view-today").2, "Today is ticked while it is open");
+    app.char("u");
+    assert_eq!(item(&app, "timer-press").0, "Pause", "and the menu follows an undo from Today");
+}
+
+#[test]
 fn today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first() {
     let mut app = App::new();
     app.one_minute();

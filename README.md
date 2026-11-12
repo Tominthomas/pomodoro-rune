@@ -56,7 +56,7 @@ Pausing is fine. A pause ties a small knot on the lantern's cord, and the block 
 
 ## Keys
 
-Press `?` in the app to see these. Every control is also a button VoiceOver can find and press.
+Press `?` in the app to see these. The Timer, View and Help menus in the menu bar list the same actions. Every control is also a button VoiceOver can find and press.
 
 | Key | What it does |
 | --- | --- |

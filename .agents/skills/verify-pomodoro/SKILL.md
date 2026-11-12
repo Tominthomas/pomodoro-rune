@@ -31,7 +31,7 @@ It is read-only. It checks macOS, a Metal GPU, `ffmpeg` and `numpy`. It checks t
 
 Pick the feature file in [`features/`](features/README.md). It names the scene, script, marks and keys for each journey. The pieces are listed here.
 
-- **A script** is timestamped input in JSON. The 20 committed ones in `scripts/` come from `tools/scripts.py`. Edit that file and run `python3 tools/scripts.py` to add or change a committed one, because CI fails when they differ. A throwaway journey goes in the evidence directory as its own JSON file, never in `scripts/`. Events are `{"t":1.0,"type":"key","name":"s"}` (names include `" "`, `Up`, `Down`, `Enter`, `Escape`, `Tab`, and `"cmd":true` for ⌘), `{"type":"type","text":"Essay"}`, `{"type":"tap","key":"control-play"}` or `"x","y"` in points, `move`, `down`, `up`, `{"type":"wheel","x":190,"y":400,"dy":-2000}`, `{"focus":false}`, `{"type":"menu-pick","id":"Mesa"}`, and `{"type":"mark","name":"skipped"}`.
+- **A script** is timestamped input in JSON. The 21 committed ones in `scripts/` come from `tools/scripts.py`. Edit that file and run `python3 tools/scripts.py` to add or change a committed one, because CI fails when they differ. A throwaway journey goes in the evidence directory as its own JSON file, never in `scripts/`. Events are `{"t":1.0,"type":"key","name":"s"}` (names include `" "`, `Up`, `Down`, `Enter`, `Escape`, `Tab`, and `"cmd":true` for ⌘), `{"type":"type","text":"Essay"}`, `{"type":"tap","key":"control-play"}` or `"x","y"` in points, `move`, `down`, `up`, `{"type":"wheel","x":190,"y":400,"dy":-2000}`, `{"focus":false}`, `{"type":"menu-pick","id":"Mesa"}` for a popup menu, `{"menu":"timer-press"}` for a menu-bar item, and `{"type":"mark","name":"skipped"}`.
 - **A scene** (`--scene NAME`) starts from a seeded moment instead of a first launch: `focus-early focus-late paused bell skipped short long evening last-minute night-minute today busy controls`. `today` has five blocks this morning and four weeks of history. A first launch has an empty log, 25-minute blocks and the length hint showing.
 - **Read the screen** at a mark with `$SKILL/scripts/look.py` (see Helpers). Assert on `text` and `label`, and treat text with `ink` under 0.5 as unreadable. That is the floor `tools/check.py` and `src/tests.rs` use.
 - **The named checks** are `python3 tools/check.py SCRIPT ...` for the checks on one script, plus the probes `pixels`, `bell-light` and `text-swap`. An unknown name fails. Run the checks for the scripts a change touches. `tools/ci.sh` runs everything and is CI's job.
@@ -71,7 +71,7 @@ Headless commands exit on their own, so there are no processes to stop. Delete t
 Headless can't show these. Verify them in the real window or list them as unverified in the PR.
 
 - Tooltip timing in the real window. Headless draws a control's tooltip in the PNG once the pointer rests on it, and the tree has its text as `help`.
-- The place menu as macOS draws it. Headless `menu-pick` proves the choice lands.
+- The place menu and the menu bar as macOS draws them. Headless `menu-pick` and `menu` events prove the choice lands, not how the menu looks.
 - The click that brings an inactive window forward. Headless fakes it with `{"focus":false}` then `{"focus":true}`, but the real activation timing isn't covered.
 - The last save being flushed to `prefs.json` on quit, and the saved file read back on the next launch.
 - Notifications posted when the window isn't in front. They need an app bundle.

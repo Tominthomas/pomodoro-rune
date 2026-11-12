@@ -35,6 +35,7 @@ FPS = {
     "four-labels": "60",
     "busy-day": "30",
     "today-label": "60",
+    "menus": "30",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
 SCENE = {
@@ -514,6 +515,17 @@ CHECKS = [
     ),
     ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
+    ("the Timer menu starts the block", "menus", "running", lambda t: label(t, "control-play") == "Pause"),
+    ("skips it", "menus", "skipped", lambda t: phase(t) == "Skipped before a minute. No lantern." and "undo" in t),
+    ("and takes the skip back", "menus", "undone", lambda t: phase(t) == "focus" and "undo" not in t),
+    ("the View menu opens Today", "menus", "today", lambda t: text(t, "today-title") == "Today"),
+    ("picks a place, and closes Today", "menus", "mesa", lambda t: label(t, "control-place") == "Place: Mesa"),
+    (
+        "the next place wraps around, and Help opens the keys",
+        "menus",
+        "keys",
+        lambda t: label(t, "control-place") == "Place: Coast" and label(t, "keys") == "Keys",
+    ),
     (
         "and says what the lanterns earn and that the timer is silent",
         "keys",

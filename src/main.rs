@@ -9,6 +9,7 @@ mod drawing;
 mod history;
 mod lantern;
 mod log;
+mod menu;
 mod readout;
 mod scene;
 mod store;
@@ -17,7 +18,7 @@ mod theme;
 mod timer;
 mod today;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
 use rune::prefs::Prefs;
@@ -150,6 +151,9 @@ pub struct State {
     /// announced once, as it happens, never again when the page or the key card changes.
     bells: u32,
     heard: Cell<u32>,
+    /// The menu bar, and the items it was last given. A test has none.
+    menu_bar: Option<AppHandle<State>>,
+    menu_shown: RefCell<Vec<menu::Item>>,
 }
 
 /// The first state, from what was saved. Headless runs keep their own settings and record in
@@ -163,13 +167,16 @@ fn init(handle: AppHandle<State>) -> State {
         SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
     };
     let cal = if headless { Calendar::UTC } else { Calendar::LOCAL };
-    restore(prefs, epoch, cal, |prefs| {
+    let menu_bar = handle.clone();
+    let mut s = restore(prefs, epoch, cal, |prefs| {
         if headless {
             Store::memory()
         } else {
             Store::open(prefs, move |e| handle.update(move |s: &mut State, _| s.save_error = e))
         }
-    })
+    });
+    s.menu_bar = Some(menu_bar);
+    s
 }
 
 /// A window's state from what `prefs` holds, as of Unix `epoch`; `open` turns the prefs into the
@@ -235,6 +242,8 @@ impl State {
             rang: None,
             bells: 0,
             heard: Cell::new(0),
+            menu_bar: None,
+            menu_shown: RefCell::new(Vec::new()),
         }
     }
 
@@ -450,6 +459,8 @@ fn poll(s: &mut State, now: f64, tx: &mut Tx) -> bool {
         changed = true;
     }
     tx.wake_at(s.next_change());
+    // A bell can ring with the window hidden, where no view runs; the menu still follows it.
+    menu::sync(s);
     if let Some(fps) = s.motion() {
         if now >= s.next_frame {
             s.drift += (1.0 / fps) as f32;
@@ -633,6 +644,7 @@ fn drag(s: &mut State, d: &mut Drag, tx: &mut Tx) {
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     s.reduced.set(cx.is_reduced_motion());
     s.drawn.set(Some(s.timed()));
+    menu::sync(s);
     let news = s.heard.replace(s.bells) != s.bells;
     let dark = cx.system_dark();
     let (water, stars) = s.lanterns();
