@@ -253,6 +253,25 @@ fn space_starts_pauses_and_resumes_the_sunset() {
 }
 
 #[test]
+fn history_tells_voiceover_which_day_the_page_shows() {
+    let mut app = App::scene("today");
+    let today = format!("day-{}", app.rt.state.today().0);
+    let yesterday = format!("day-{}", app.rt.state.today().0 - 1);
+    let pressed = |app: &App, key: &str| {
+        let states = app.node(key).unwrap_or_else(|| panic!("{key} is in the tree"))["states"].clone();
+        states.as_array().is_some_and(|s| s.contains(&"checked".into()))
+    };
+    assert!(app.node(&today).unwrap()["name"].as_str().unwrap().contains(", today:"));
+    assert!(pressed(&app, &today) && !pressed(&app, &yesterday), "today is the day shown");
+    app.voiceover_press(&yesterday);
+    app.look();
+    assert!(pressed(&app, &yesterday) && !pressed(&app, &today), "the day picked is the one shown");
+    app.voiceover_press("back-to-today");
+    app.look();
+    assert!(pressed(&app, &today) && !pressed(&app, &yesterday), "and today again, after focus moved away");
+}
+
+#[test]
 fn a_tap_on_the_sky_starts_pauses_and_resumes_it_too() {
     let mut app = App::new();
     app.tap("sky");

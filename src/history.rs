@@ -135,6 +135,7 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let key = format!("day-{}", day.0);
     let d = day.date();
     let named = format!("{} {} {}", DAYS[day.weekday() as usize], d.day, MONTHS[d.month as usize - 1]);
+    let named = if day == today { format!("{named}, today") } else { named };
     let number = label(k, &d.day.to_string(), 9.5, if day == today { 640.0 } else { 480.0 }, 0.95);
     let column = |tile: El| col().gap(2.0).child(number).child(tile);
     if day > today {
@@ -151,7 +152,8 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let spoken = if t.blocks == 0 {
         format!("{named}: nothing")
     } else {
-        format!("{named}: {} focused, {} lit", duration(t.focused), t.lanterns)
+        let lit = if t.lanterns == 1 { "1 lantern".to_string() } else { format!("{} lanterns", t.lanterns) };
+        format!("{named}: {} focused, {lit}", duration(t.focused))
     };
     let tile = if t.focused == 0 {
         let still = Shape::new().line(
@@ -172,6 +174,8 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
         .role("button")
         .label(spoken.clone())
         .help(spoken)
+        // The day the page above shows is the pressed one, for VoiceOver as for the eye.
+        .checked(l.day == day)
         .focusable(true)
         .focus_ring(1.5, 1.5, k.text.alpha(0.95))
         .on_hover_change(move |s: &mut State, on, _| {
