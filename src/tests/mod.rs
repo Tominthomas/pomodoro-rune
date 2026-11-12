@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use rune::{Env, Mods, Runtime};
+use rune::{Env, Key, KeyEvent, Mods, Runtime};
 use serde_json::Value;
 
 use super::*;
@@ -62,7 +62,7 @@ impl App {
         let s = restore(disk.prefs(), unix, UTC, |_| disk.store());
         let mut rt = Runtime::new(s, view, (W, H), Env::new(false, 1.0));
         rt.poll = Some(poll);
-        rt.on_key = Some(on_key);
+        rt.on_key = Some(input::on_key);
         rt.frame(STEP);
         App { rt, disk: disk.clone() }
     }
