@@ -121,6 +121,11 @@ impl App {
     /// A click on the element keyed `key`, held as long as a person holds one.
     fn tap(&mut self, key: &str) {
         let (x, y) = self.rt.find(key).unwrap_or_else(|| panic!("{key} is on screen"));
+        self.click_at(x, y);
+    }
+
+    /// A click at `x, y` in window points, wherever it lands.
+    fn click_at(&mut self, x: f32, y: f32) {
         self.rt.pointer_move(x, y);
         self.rt.pointer_down(x, y);
         self.rt.frame(0.08);
@@ -418,6 +423,24 @@ fn the_activating_click_on_a_control_does_nothing_either() {
     app.tap("control-play");
     app.wait(1.0);
     assert_eq!(app.phase(), "focus");
+}
+
+#[test]
+fn two_quick_clicks_on_start_start_then_pause_and_never_end_the_block() {
+    let mut app = App::new();
+    let slot =
+        |app: &App| app.rt.elements().into_iter().find(|e| e.key.as_deref() == Some("control-play")).unwrap().rect;
+    let waiting = slot(&app);
+    // Where the round-one critique double-clicked: inside Start, left of its middle.
+    let (x, y) = (waiting[0] + 0.4 * waiting[2], waiting[1] + waiting[3] / 2.0);
+    app.click_at(x, y);
+    app.rt.frame(0.2);
+    assert_eq!(slot(&app), waiting, "running, Pause takes Start's whole place");
+    app.click_at(x, y);
+    app.look();
+    assert_eq!(app.phase(), "the sky waits · space to resume", "the second click pauses");
+    assert_eq!(slot(&app), waiting, "and Resume keeps it");
+    assert!(app.rt.state.study.log.blocks.is_empty() && !app.has("undo"), "nothing was ended");
 }
 
 #[test]

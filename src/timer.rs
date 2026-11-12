@@ -103,7 +103,8 @@ pub enum Clock {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Event {
-    /// A tap on the scene, or Space.
+    /// A tap on the scene, or Space: starts, pauses or resumes, and during a bell starts what
+    /// comes next.
     Press { now: f64 },
     /// The hand moved the length by `secs`. Grabs it first if needed. Only while wound.
     Scrub { secs: f64 },
@@ -232,7 +233,12 @@ impl Timer {
             return fx;
         }
         match (self.clock.clone(), event) {
-            (Clock::Ringing { kept, .. }, Event::Press { .. }) => self.advance_by(kept, &mut fx),
+            // The bell offers the next phase by name, so a press starts it rather than only cutting
+            // the bell short.
+            (Clock::Ringing { kept, .. }, Event::Press { now }) => {
+                self.advance_by(kept, &mut fx);
+                self.start(self.length(), now, &mut fx);
+            }
             (Clock::Ringing { until, kept, .. }, Event::Due { now }) if now >= until => self.advance_by(kept, &mut fx),
             (Clock::Ringing { .. }, _) => {}
 
@@ -577,13 +583,14 @@ mod tests {
     }
 
     #[test]
-    fn a_press_while_ringing_moves_on_without_waiting_for_the_bell() {
+    fn a_press_while_ringing_starts_the_break_without_waiting_for_the_bell() {
         let mut t = Timer::default();
         t.step(Event::Press { now: 0.0 });
         t.step(Event::Due { now: 1500.0 });
         assert!(matches!(t.clock, Clock::Ringing { .. }));
         t.step(Event::Press { now: 1500.3 });
         assert_eq!(t.phase, Phase::Short);
+        assert!(matches!(t.clock, Clock::Ticking { ends_at: 1800.3, .. }), "{:?}", t.clock);
     }
 
     #[test]

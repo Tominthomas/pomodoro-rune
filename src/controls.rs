@@ -11,11 +11,12 @@ use rune::{El, PopupMenu, Tx, canvas, col, el, row, text};
 
 use crate::readout::{BRIGHT, QUIET, SMALL, button, line};
 use crate::theme::{Ink, PLACES, Place, rgb};
-use crate::timer::{Clock, Event, Phase};
+use crate::timer::{Clock, Event, Phase, Timer};
 use crate::{CONTROLS_LINGER, State, carry, guarded, open_today, set_place};
 
-/// The corner the controls live in, measured from the window's bottom right.
-const DOCK: (f32, f32) = (330.0, 56.0);
+/// How far the controls sit in from the window's bottom right; their corner reaches that far
+/// around them.
+const MARGIN: f32 = 14.0;
 /// How tall the dock's quieter controls stand.
 const TALL: f32 = 28.0;
 
@@ -59,56 +60,52 @@ fn tab(k: Ink, words: &str) -> El {
         .child(line(k, words, SMALL, 540.0, BRIGHT))
 }
 
-/// The waiting block's way in: what pressing it starts, in words, drawn in the ink itself.
-fn primary(k: Ink, words: &str) -> El {
+/// How wide the primary control stands in every state, so Start, Pause and Resume share one
+/// target and no other control ever moves into the place a press just landed.
+const PRIMARY_W: f32 = 116.0;
+
+/// What the primary control does now, in its own words. The dock, Today and the menu all say it.
+pub fn press_words(t: &Timer) -> &'static str {
+    match (&t.clock, t.settled().0) {
+        (Clock::Ticking { .. }, _) => "Pause",
+        (Clock::Paused { .. }, _) => "Resume",
+        (_, Phase::Focus) => "Start focus",
+        _ => "Start break",
+    }
+}
+
+/// The primary control's look: what pressing it does, in words beside its glyph, drawn in the ink
+/// itself.
+fn primary(k: Ink, t: &Timer) -> El {
     let on = Ink { text: k.shade, shade: k.text };
-    let triangle = Shape::new().fill(vec![[1.0, 0.5], [9.0, 5.5], [1.0, 10.5]], on.text);
+    let glyph = if matches!(t.clock, Clock::Ticking { .. }) {
+        Shape::new().line([2.5, 1.5], [2.5, 9.5], 2.2, LineCap::Round, on.text).line(
+            [7.5, 1.5],
+            [7.5, 9.5],
+            2.2,
+            LineCap::Round,
+            on.text,
+        )
+    } else {
+        Shape::new().fill(vec![[1.0, 0.5], [9.0, 5.5], [1.0, 10.5]], on.text)
+    };
     row()
+        .w(PRIMARY_W)
         .h(34.0)
-        .pl(13.0)
-        .pr(15.0)
         .gap(7.0)
-        .center_y()
+        .center()
         .radius(17.0)
         .fill(k.text.alpha(0.92))
         .hover(k.shade.alpha(0.12))
-        .child(canvas(triangle).size(10.0, 11.0))
-        .child(line(on, words, 12.0, 600.0, 1.0))
+        .child(canvas(glyph).size(10.0, 11.0))
+        .child(line(on, press_words(t), 12.0, 600.0, 1.0))
 }
 
 pub fn view(s: &State, k: Ink) -> El {
     let shown = s.controls_shown();
     let t = &s.timer;
     let press = act(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx));
-    let play = if matches!(t.clock, Clock::Wound | Clock::Scrubbing { .. }) {
-        let words = if t.phase == Phase::Focus { "Start focus" } else { "Start break" };
-        docked(k, "control-play", words, "Space", 17.0, shown, primary(k, words))
-    } else {
-        // Running, the primary control is a glyph, small enough to recede with the rest.
-        let on = k.shade;
-        let (glyph, label) = match t.clock {
-            Clock::Ticking { .. } => (
-                Shape::new().line([5.0, 3.0], [5.0, 13.0], 2.4, LineCap::Round, on).line(
-                    [11.0, 3.0],
-                    [11.0, 13.0],
-                    2.4,
-                    LineCap::Round,
-                    on,
-                ),
-                "Pause",
-            ),
-            Clock::Paused { .. } => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Resume"),
-            _ => (Shape::new().fill(vec![[4.5, 2.0], [14.0, 8.0], [4.5, 14.0]], on), "Start"),
-        };
-        let look = el()
-            .size(38.0, 38.0)
-            .radius(19.0)
-            .center()
-            .fill(k.text.alpha(0.92))
-            .hover(k.shade.alpha(0.12))
-            .child(canvas(glyph).size(16.0, 16.0));
-        docked(k, "control-play", label, "Space", 19.0, shown, look)
-    };
+    let play = docked(k, "control-play", press_words(t), "Space", 17.0, shown, primary(k, t));
     // The controls change places at once as the set changes, so no word ever slides over another;
     // only their looks fade.
     let mut r = row().key("controls").gap(6.0).center_y().instant_changes();
@@ -164,7 +161,7 @@ pub fn view(s: &State, k: Ink) -> El {
         .key("dock")
         .role("none")
         .pin(None, None, Some(0.0), Some(0.0))
-        .size(DOCK.0, DOCK.1)
+        .padding(MARGIN)
         .on_drag(|_: &mut State, _, _| {})
         .on_hover_change(|s: &mut State, inside, tx: &mut Tx| {
             s.over_controls = inside;
@@ -173,7 +170,7 @@ pub fn view(s: &State, k: Ink) -> El {
                 tx.wake_at(s.controls_until);
             }
         })
-        .child(r.pin(None, None, Some(14.0), Some(14.0)));
+        .child(r);
     if shown {
         dock
     } else {

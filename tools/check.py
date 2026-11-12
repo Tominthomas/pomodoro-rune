@@ -28,6 +28,7 @@ FPS = {
     "activate": "60",
     "activate-control": "60",
     "dock": "30",
+    "double-start": "60",
     "drag": "60",
     "today": "60",
     "bell": "60",
@@ -402,6 +403,16 @@ CHECKS = [
         lambda t: text(t, "time") == "25:00" and phase(t) == "focus · click the sky or press space to begin",
     ),
     ("and the next click on it starts the sunset", "activate-control", "started", lambda t: phase(t) == "focus"),
+    (
+        "two quick clicks on Start start the block and pause it, and end nothing",
+        "double-start",
+        "inspect",
+        lambda t: (
+            phase(t) == "the sky waits · space to resume"
+            and t["@a11y"]["control-play"].get("name") == "Resume"
+            and "undo" not in t
+        ),
+    ),
     (
         "the controls stay while the pointer rests on them",
         "dock",

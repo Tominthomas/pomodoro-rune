@@ -184,6 +184,13 @@ SCRIPTS = {
         {"t": 3.0, "type": "tap", "key": "control-play"},
         mark(4.0, "started"),
     ],
+    # Two quick clicks where Start is drawn, as round one's critique made them: they start the
+    # block, then pause it.
+    "double-start": [
+        {"t": 0.1, "type": "tap", "x": 140, "y": 510},
+        {"t": 0.3, "type": "tap", "x": 140, "y": 510},
+        mark(0.8, "inspect"),
+    ],
     # With a block running, the pointer rests on the controls' corner: they stay. A click in the
     # corner off any control, and one where a control has faded, never reach the sky.
     "dock": [

@@ -8,6 +8,7 @@ use rune::shape::{LineCap, Shape};
 use rune::tok::TextStyle;
 use rune::{El, Key, KeyEvent, ScrollSpec, TextEdit, Tx, canvas, col, el, row, text, text_input};
 
+use crate::controls;
 use crate::drawing::ring;
 use crate::history;
 use crate::lantern::{self, Lantern, Pose};
@@ -172,24 +173,19 @@ fn now_bar(l: &Ledger<'_>) -> El {
     let k = l.ink();
     let t = l.timer;
     let time = mmss(t.shown(l.clock));
-    let (words, press) = match (&t.clock, t.phase) {
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => {
-            (format!("Focus ready · {time}"), Some("Start focus"))
-        }
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => {
-            (format!("Break ready · {time}"), Some("Start break"))
-        }
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => {
-            (format!("Long break ready · {time}"), Some("Start break"))
-        }
-        (Clock::Ticking { .. }, Phase::Focus) => (format!("Focus · {time} left"), Some("Pause")),
-        (Clock::Ticking { .. }, Phase::Short) => (format!("Break · {time} left"), Some("Pause")),
-        (Clock::Ticking { .. }, Phase::Long) => (format!("Long break · {time} left"), Some("Pause")),
-        (Clock::Paused { .. }, _) => (format!("Paused · {time} left"), Some("Resume")),
-        (Clock::Ringing { kept: true, .. }, Phase::Focus) => ("Focus complete".into(), None),
-        (Clock::Ringing { .. }, Phase::Focus) => ("Let go".into(), None),
-        (Clock::Ringing { .. }, _) => ("Break over".into(), None),
+    let words = match (&t.clock, t.phase) {
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => format!("Focus ready · {time}"),
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => format!("Break ready · {time}"),
+        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => format!("Long break ready · {time}"),
+        (Clock::Ticking { .. }, Phase::Focus) => format!("Focus · {time} left"),
+        (Clock::Ticking { .. }, Phase::Short) => format!("Break · {time} left"),
+        (Clock::Ticking { .. }, Phase::Long) => format!("Long break · {time} left"),
+        (Clock::Paused { .. }, _) => format!("Paused · {time} left"),
+        (Clock::Ringing { kept: true, .. }, Phase::Focus) => "Focus complete".into(),
+        (Clock::Ringing { .. }, Phase::Focus) => "Let go".into(),
+        (Clock::Ringing { .. }, _) => "Break over".into(),
     };
+    let press = controls::press_words(t);
     let mut said = col().gap(3.0).shrink().child(label(k, &words, 13.0, 560.0, 0.97).key("timer-text"));
     if let Some(status) = l.status.clone() {
         said = said.child(status.wrap());
@@ -201,12 +197,10 @@ fn now_bar(l: &Ledger<'_>) -> El {
                 .on_press_tx(guarded(|s, tx| carry(s, Event::Undo { now: tx.clock() }, tx))),
         );
     }
-    if let Some(press) = press {
-        acts = acts.child(
-            button(k, "timer-press", press, &format!("{press}  Space"))
-                .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
-        );
-    }
+    acts = acts.child(
+        button(k, "timer-press", press, &format!("{press}  Space"))
+            .on_press_tx(guarded(|s, tx| carry(s, Event::Press { now: tx.clock() }, tx))),
+    );
     row()
         .key("timer-bar")
         .w(WIDE)
