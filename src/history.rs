@@ -130,8 +130,8 @@ fn sunset(l: &Ledger<'_>, step: usize, lit: u32, (w, h): (f32, f32)) -> El {
                 (1.0, dusk(p.sea_lo)),
             ],
         )
-        .child(canvas(sky).absolute(0.0, 0.0).size(w, shore).blur(1.2))
-        .child(canvas(sea).absolute(0.0, 0.0).size(w, h))
+        .child(canvas(sky).absolute(0.0, 0.0).size(w, shore).blur(1.2).a11y_hidden())
+        .child(canvas(sea).absolute(0.0, 0.0).size(w, h).a11y_hidden())
 }
 
 /// A day: its date, quiet over its sunset. A past day with no focus is still water under a pale
@@ -170,7 +170,7 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
             rune::shape::LineCap::Round,
             k.text.alpha(0.2),
         );
-        el().size(tw, th).radius(6.0).fill(k.text.alpha(0.07)).child(canvas(still).size(tw, th))
+        el().size(tw, th).radius(6.0).fill(k.text.alpha(0.07)).child(canvas(still).size(tw, th).a11y_hidden())
     } else {
         sunset(l, step(t.focused), t.lanterns, tile(l.wide))
     };

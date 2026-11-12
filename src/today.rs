@@ -351,7 +351,7 @@ fn key_row(k: Ink, wide: f32) -> El {
             .key(key.to_string())
             .gap(5.0)
             .center_y()
-            .child(canvas(glyph).size(14.0, 12.0))
+            .child(canvas(glyph).size(14.0, 12.0).a11y_hidden())
             .child(label(k, words, 10.5, 460.0, 0.82))
     };
     let lit = Shape::new().fill(vec![[4.0, 2.5], [10.0, 2.5], [10.5, 9.5], [3.5, 9.5]], lantern).line(
@@ -604,7 +604,7 @@ fn strip(l: &Ledger<'_>, blocks: &[(u64, &Block)]) -> El {
             .w(wide)
             .gap(2.0)
             .pb(10.0)
-            .child(art.child(canvas(sh).absolute(0.0, 0.0).size(wide, h).inert()))
+            .child(art.child(canvas(sh).absolute(0.0, 0.0).size(wide, h).inert().a11y_hidden()))
             .child(marks),
     )
 }

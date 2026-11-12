@@ -144,3 +144,21 @@ fn each_bell_is_announced_once_politely_whatever_page_is_open() {
     app.rt.frame(5.0 * 60.0);
     assert_eq!(app.status(), Some(("Break complete. Focus ready.".into(), true)));
 }
+
+#[test]
+fn voiceover_meets_no_unnamed_picture_in_any_scene() {
+    for (scene, _) in demo::SCENES {
+        let app = App::scene(scene);
+        let mut unnamed = Vec::new();
+        let mut stack = vec![app.rt.accessibility_json()];
+        while let Some(mut n) = stack.pop() {
+            if n["role"] == "image" && n["name"].as_str().is_none_or(str::is_empty) {
+                unnamed.push(n["bounds"].to_string());
+            }
+            if let Value::Array(children) = n["children"].take() {
+                stack.extend(children);
+            }
+        }
+        assert!(unnamed.is_empty(), "{scene} has pictures VoiceOver can't name, at {unnamed:?}");
+    }
+}
