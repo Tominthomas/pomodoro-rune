@@ -421,6 +421,7 @@ fn detail(l: &Ledger<'_>, serial: u64, b: &Block) -> El {
     let name = if l.nav.open.is_some_and(|d| d.renaming) {
         text_input(l.rename, TextStyle::new(11.5, 480.0))
             .key("detail-label-field")
+            .label("Name for this block")
             .single_line()
             .w(150.0)
             .color(k.text.alpha(0.97))

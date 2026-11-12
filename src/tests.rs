@@ -369,6 +369,26 @@ fn l_from_today_names_the_next_block_and_its_letters_never_reach_the_timer() {
 }
 
 #[test]
+fn both_name_fields_say_what_they_name_empty_or_filled() {
+    let mut app = App::new();
+    let field = |app: &App, key: &str| {
+        let n = app.node(key).unwrap_or_else(|| panic!("{key} is in the accessibility tree"));
+        (n["name"].as_str().unwrap_or_default().to_string(), n["value"].as_str().unwrap_or_default().to_string())
+    };
+    app.char("l");
+    app.look();
+    assert_eq!(field(&app, "label-field"), ("Name for the next block".into(), String::new()));
+    app.typed("Essay");
+    assert_eq!(field(&app, "label-field"), ("Name for the next block".into(), "Essay".into()));
+    app.key(Key::Enter);
+    let mut today = App::scene("today");
+    today.tap("day-lantern-0");
+    today.tap("detail-rename");
+    today.look();
+    assert_eq!(field(&today, "detail-label-field"), ("Name for this block".into(), "Reading & notes".into()));
+}
+
+#[test]
 fn a_name_being_typed_keeps_its_letters_even_when_its_field_lost_focus() {
     let mut app = App::new();
     app.char("l");

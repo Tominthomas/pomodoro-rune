@@ -457,6 +457,15 @@ CHECKS = [
         ),
     ),
     (
+        "the name field says what it names to VoiceOver, with what is typed as its value",
+        "today-label",
+        "typing",
+        lambda t: (
+            t["@a11y"]["label-field"].get("name") == "Name for the next block"
+            and t["@a11y"]["label-field"].get("value") == "Study the last unit, slowly"
+        ),
+    ),
+    (
         "a long label is cut short inside the window",
         "long-label",
         "end",

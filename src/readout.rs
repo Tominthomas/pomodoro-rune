@@ -215,6 +215,7 @@ fn label(s: &State, k: Ink) -> El {
     if s.editing {
         return text_input(&s.label, TextStyle::new(LEAD, 480.0))
             .key("label-field")
+            .label("Name for the next block")
             .single_line()
             .w(LABEL_W)
             .color(k.text.alpha(BRIGHT))
