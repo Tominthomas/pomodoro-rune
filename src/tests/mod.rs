@@ -167,6 +167,29 @@ impl App {
         }
     }
 
+    /// Presses at `x, y` and drags `dy` points, down when positive, a few points a frame, as a
+    /// hand does. It stays held; `let_go` lifts it.
+    fn hold(&mut self, x: f32, y: f32, dy: f32) -> (f32, f32) {
+        self.rt.pointer_move(x, y);
+        self.rt.pointer_down(x, y);
+        let steps = (dy.abs() / 3.0).ceil() as u16;
+        for i in 1..=steps {
+            self.rt.pointer_move(x, y + dy * f32::from(i) / f32::from(steps));
+            self.rt.frame(STEP);
+        }
+        (x, y + dy)
+    }
+
+    fn hold_sun(&mut self, dy: f32) -> (f32, f32) {
+        let [x, y, w, h] = self.rect("sun");
+        self.hold(x + w / 2.0, y + h / 2.0, dy)
+    }
+
+    fn let_go(&mut self, (x, y): (f32, f32)) {
+        self.rt.pointer_up(x, y);
+        self.wait(STEP);
+    }
+
     /// Starts the waiting block and runs it to its bell.
     fn run_to_bell(&mut self) {
         self.space();

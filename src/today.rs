@@ -198,9 +198,9 @@ fn now_bar(l: &Ledger<'_>) -> El {
     let t = l.timer;
     let time = mmss(t.shown(l.clock));
     let words = match (&t.clock, t.phase) {
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Focus) => format!("Focus ready · {time}"),
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Short) => format!("Break ready · {time}"),
-        (Clock::Wound | Clock::Scrubbing { .. }, Phase::Long) => format!("Long break ready · {time}"),
+        (Clock::Wound, Phase::Focus) => format!("Focus ready · {time}"),
+        (Clock::Wound, Phase::Short) => format!("Break ready · {time}"),
+        (Clock::Wound, Phase::Long) => format!("Long break ready · {time}"),
         (Clock::Ticking { .. }, Phase::Focus) => format!("Focus · {time} left"),
         (Clock::Ticking { .. }, Phase::Short) => format!("Break · {time} left"),
         (Clock::Ticking { .. }, Phase::Long) => format!("Long break · {time} left"),

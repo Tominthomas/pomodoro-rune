@@ -94,11 +94,17 @@ pub enum Clock {
     Ticking { ends_at: f64, tick: f64, run: Run },
     /// Held with `secs` left since `since`.
     Paused { secs: u32, since: f64, run: Run },
-    /// A hand is setting the length. `secs` is continuous; it shows snapped to whole minutes.
-    Scrubbing { secs: f64 },
     /// The phase is over and the next winds up at `until`. `kept` is false for a focus block
     /// skipped, which doesn't count; `from` is how far through it was when it ended.
     Ringing { until: f64, kept: bool, from: f32 },
+}
+
+/// A hand setting the length of `phase`. `secs` is continuous; it shows snapped to whole
+/// minutes. It is apart from the clock, so a break runs on while the next block is set.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Setting {
+    pub phase: Phase,
+    pub secs: f64,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -106,7 +112,8 @@ pub enum Event {
     /// A tap on the scene, or Space: starts, pauses or resumes, and during a bell starts what
     /// comes next.
     Press { now: f64 },
-    /// The hand moved the length by `secs`. Grabs it first if needed. Only while wound.
+    /// The hand moved the length by `secs`. Grabs it first if needed. Only while there is a
+    /// length to set: see `Timer::settable`.
     Scrub { secs: f64 },
     /// The hand lifted: the length is set, and the block waits for a press like any other.
     Release,
@@ -165,6 +172,7 @@ pub struct Timer {
     pub done: u8,
     pub lengths: Lengths,
     pub clock: Clock,
+    pub setting: Option<Setting>,
     /// The block skipped last, as it was, until the next phase starts.
     undo: Option<Clock>,
 }
@@ -178,7 +186,7 @@ impl Default for Timer {
 impl Timer {
     /// A timer waiting at `phase` with `done` blocks in the cycle, as a relaunch finds it.
     pub fn resume(phase: Phase, done: u8, lengths: Lengths) -> Timer {
-        Timer { phase, done: done.min(CYCLE), lengths, clock: Clock::Wound, undo: None }
+        Timer { phase, done: done.min(CYCLE), lengths, clock: Clock::Wound, setting: None, undo: None }
     }
 
     /// Whether the block skipped last can still be taken back: until the next phase starts, so
@@ -191,15 +199,32 @@ impl Timer {
     pub fn length(&self) -> u32 {
         match &self.clock {
             Clock::Ticking { run, .. } | Clock::Paused { run, .. } => run.planned,
-            Clock::Scrubbing { secs } => snap(*secs),
-            _ => self.lengths.of(self.phase),
+            _ => self.length_of(self.phase),
+        }
+    }
+
+    /// The length `phase` is set to, live while a hand is setting it.
+    pub fn length_of(&self, phase: Phase) -> u32 {
+        match self.setting {
+            Some(setting) if setting.phase == phase => snap(setting.secs),
+            _ => self.lengths.of(phase),
+        }
+    }
+
+    /// The phase whose length a hand can set now: the one waiting to start, or during a break,
+    /// the focus block after it. Never a focus block that has started.
+    pub fn settable(&self) -> Option<Phase> {
+        match (&self.clock, self.phase) {
+            (Clock::Wound, phase) => Some(phase),
+            (_, Phase::Short | Phase::Long) => Some(Phase::Focus),
+            (_, Phase::Focus) => None,
         }
     }
 
     /// Seconds left, continuous while ticking.
     pub fn remaining(&self, now: f64) -> f64 {
         match &self.clock {
-            Clock::Wound | Clock::Scrubbing { .. } => f64::from(self.length()),
+            Clock::Wound => f64::from(self.length()),
             Clock::Paused { secs, .. } => f64::from(*secs),
             Clock::Ticking { ends_at, .. } => (ends_at - now).max(0.0),
             Clock::Ringing { .. } => 0.0,
@@ -230,24 +255,38 @@ impl Timer {
 
     pub fn step(&mut self, event: Event) -> Effects<Effect> {
         let mut fx = Effects::none();
-        if let Event::Undo { now } = event {
-            self.undo(now, &mut fx);
-            return fx;
+        match event {
+            Event::Undo { now } => self.undo(now, &mut fx),
+            Event::Scrub { secs } => self.scrub(secs),
+            Event::Release => {
+                if let Some(Setting { phase, secs }) = self.setting.take() {
+                    self.set_length(phase, snap(secs), &mut fx);
+                }
+            }
+            Event::Press { .. } if self.setting.is_some() => {}
+            _ => self.step_clock(event, &mut fx),
         }
+        if self.setting.is_some_and(|setting| self.settable() != Some(setting.phase)) {
+            self.setting = None;
+        }
+        fx
+    }
+
+    fn step_clock(&mut self, event: Event, fx: &mut Effects<Effect>) {
         match (self.clock.clone(), event) {
             // The bell offers the next phase by name, so a press starts it rather than only cutting
             // the bell short.
             (Clock::Ringing { kept, .. }, Event::Press { now }) => {
-                self.advance_by(kept, &mut fx);
-                self.start(self.length(), now, &mut fx);
+                self.advance_by(kept, fx);
+                self.start(self.length(), now, fx);
             }
-            (Clock::Ringing { until, kept, .. }, Event::Due { now }) if now >= until => self.advance_by(kept, &mut fx),
+            (Clock::Ringing { until, kept, .. }, Event::Due { now }) if now >= until => self.advance_by(kept, fx),
             (Clock::Ringing { .. }, _) => {}
 
-            (Clock::Wound, Event::Press { now }) => self.start(self.length(), now, &mut fx),
+            (Clock::Wound, Event::Press { now }) => self.start(self.length(), now, fx),
             (Clock::Paused { secs, since, mut run }, Event::Press { now }) => {
                 run.paused += (now - since).max(0.0);
-                self.tick(now + f64::from(secs), now, run, &mut fx);
+                self.tick(now + f64::from(secs), now, run, fx);
             }
             (Clock::Ticking { ends_at, mut run, .. }, Event::Press { now }) => {
                 let secs = (ends_at - now).max(0.0).ceil() as u32;
@@ -255,19 +294,9 @@ impl Timer {
                 self.clock = Clock::Paused { secs, since: now, run };
             }
 
-            (Clock::Wound, Event::Scrub { secs }) => {
-                self.clock = Clock::Scrubbing {
-                    secs: (f64::from(self.length()) + secs).clamp(f64::from(MIN_SECS), f64::from(MAX_SECS)),
-                };
-            }
-            (Clock::Scrubbing { secs: from }, Event::Scrub { secs }) => {
-                self.clock = Clock::Scrubbing { secs: (from + secs).clamp(f64::from(MIN_SECS), f64::from(MAX_SECS)) };
-            }
-            (Clock::Scrubbing { secs }, Event::Release) => self.set_length(snap(secs), &mut fx),
-
             (Clock::Wound, Event::Nudge { minutes }) => {
                 let secs = i64::from(self.length() / 60 * 60) + i64::from(minutes) * 60;
-                self.set_length(secs.clamp(0, i64::from(MAX_SECS)) as u32, &mut fx);
+                self.set_length(self.phase, secs.clamp(0, i64::from(MAX_SECS)) as u32, fx);
             }
 
             (Clock::Ticking { ends_at, run, .. }, Event::Due { now }) if now >= ends_at => {
@@ -280,16 +309,21 @@ impl Timer {
                 fx.push(Effect::WakeAt(until));
             }
             (Clock::Ticking { ends_at, tick, run }, Event::Due { now }) if now >= tick => {
-                self.tick(ends_at, now, run, &mut fx);
+                self.tick(ends_at, now, run, fx);
             }
 
             (Clock::Ticking { .. } | Clock::Paused { .. }, Event::Skip { now }) if self.phase == Phase::Focus => {
-                self.skip_block(now, &mut fx);
+                self.skip_block(now, fx);
             }
-            (_, Event::Skip { .. }) => self.advance_by(false, &mut fx),
+            (_, Event::Skip { .. }) => self.advance_by(false, fx),
             _ => {}
         }
-        fx
+    }
+
+    fn scrub(&mut self, by: f64) {
+        let Some(phase) = self.settable() else { return };
+        let from = self.setting.map_or(f64::from(self.lengths.of(phase)), |setting| setting.secs);
+        self.setting = Some(Setting { phase, secs: (from + by).clamp(f64::from(MIN_SECS), f64::from(MAX_SECS)) });
     }
 
     fn start(&mut self, secs: u32, now: f64, fx: &mut Effects<Effect>) {
@@ -347,9 +381,8 @@ impl Timer {
         }
     }
 
-    fn set_length(&mut self, secs: u32, fx: &mut Effects<Effect>) {
-        self.lengths.set(self.phase, secs);
-        self.clock = Clock::Wound;
+    fn set_length(&mut self, phase: Phase, secs: u32, fx: &mut Effects<Effect>) {
+        self.lengths.set(phase, secs);
         fx.push(Effect::Lengths(self.lengths));
     }
 
@@ -607,6 +640,34 @@ mod tests {
         assert!(fx.contains(&Effect::Lengths(Lengths { focus: 240, ..Lengths::default() })), "{fx:?}");
         t.step(Event::Press { now: 2.0 });
         assert!(matches!(t.clock, Clock::Ticking { ends_at: 242.0, tick: 3.0, .. }));
+    }
+
+    #[test]
+    fn a_drag_during_a_break_sets_the_next_block_and_the_break_runs_on() {
+        let mut t = Timer { phase: Phase::Short, ..Timer::default() };
+        t.step(Event::Press { now: 0.0 });
+        assert_eq!(t.settable(), Some(Phase::Focus));
+        t.step(Event::Scrub { secs: 5.0 * 60.0 + 20.0 });
+        t.step(Event::Press { now: 1.0 });
+        assert!(matches!(t.clock, Clock::Ticking { .. }), "a press waits for the hand to let go");
+        assert_eq!((t.length(), t.length_of(Phase::Focus)), (300, 30 * 60), "the break keeps its own length");
+        let fx: Vec<_> = t.step(Event::Release).into_iter().collect();
+        assert!(fx.contains(&Effect::Lengths(Lengths { focus: 30 * 60, ..Lengths::default() })), "{fx:?}");
+        let mut now = 0.0;
+        run_to_end(&mut t, &mut now);
+        assert_eq!((t.phase, t.length()), (Phase::Focus, 30 * 60));
+    }
+
+    #[test]
+    fn a_break_that_ends_under_the_hand_keeps_the_length_it_is_setting() {
+        let mut t = Timer { phase: Phase::Short, ..Timer::default() };
+        let mut now = 0.0;
+        t.step(Event::Press { now });
+        t.step(Event::Scrub { secs: -10.0 * 60.0 });
+        run_to_end(&mut t, &mut now);
+        assert_eq!((t.phase, t.length()), (Phase::Focus, 15 * 60), "the next block waits, still in hand");
+        t.step(Event::Release);
+        assert_eq!((t.setting, t.lengths.of(Phase::Focus)), (None, 15 * 60));
     }
 
     #[test]

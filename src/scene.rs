@@ -18,9 +18,9 @@ use crate::timer::{Clock, Phase, RING, Timer};
 const SUN_R: f32 = 36.0;
 /// How far the glow, flash and glitter reach, relative to the sun they were tuned for.
 const SUN_SCALE: f32 = SUN_R / 23.0;
-/// How high the sun starts for an hour-long block. Shorter blocks start lower, on a square
-/// root so that a five-minute block still has sky to cross.
-const RISE: f32 = 240.0;
+/// How high the sun's lower limb starts above the sea: the same for every block, so a short one
+/// gets the whole sunset too.
+pub const RISE: f32 = 240.0;
 /// Along the sun's path, 1 is its lower limb on the water and `UNDER` its upper limb.
 const UNDER: f32 = 2.0;
 /// How long the bell takes to sink the sun, in seconds.
@@ -157,8 +157,9 @@ pub struct Scene<'a> {
     pub sky: Sky,
     pub place: &'static Place,
     pub dark: bool,
-    /// The length of the block being set or run, in seconds: it sets how high the sun starts.
-    pub length: u32,
+    /// How high the sun's path starts, its lower limb this many points above the sea: `RISE`,
+    /// or wherever a hand holds it while setting the length.
+    pub rise: f32,
     /// Seconds of fine motion (glitter, drifting clouds, bobbing lanterns). Frozen while still.
     pub drift: f32,
     /// This cycle's lanterns, oldest first. At the bell the last one is the one blooming.
@@ -178,7 +179,7 @@ pub fn view(s: &Scene<'_>) -> El {
     let p = s.place.pal(x);
     let t = s.drift;
     let sun_p = s.sky.sun();
-    let rise = rise(f64::from(s.length)) as f32;
+    let rise = s.rise;
     let squash = SUN_R * squash(sun_p);
     let sun = [f.w * 0.5 - 4.0 + 34.0 * sun_p.min(1.0), sun_y(f, sun_p, rise)];
     let sun_vis = ((UNDER + 0.05 - sun_p) / 0.05).clamp(0.0, 1.0);
@@ -610,12 +611,13 @@ fn grain_tile() -> &'static Pixels {
     })
 }
 
-/// How far above the sea, in points, the sun starts for a block of `secs`.
+/// The hand's scale for setting a length: how far, in points, a hand raises the sun for a block
+/// of `secs`. On a square root, so short blocks take finer steps.
 pub fn rise(secs: f64) -> f64 {
     f64::from(RISE) * (secs / 3600.0).max(0.0).sqrt()
 }
 
-/// The block length whose sun starts `rise` points above the sea: dragging the sun sets it.
+/// The block length `rise` points up the hand's scale.
 pub fn length_at(rise: f64) -> f64 {
     3600.0 * (rise.max(0.0) / f64::from(RISE)).powi(2)
 }

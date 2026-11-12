@@ -118,8 +118,8 @@ pub fn phase_line(s: &State) -> String {
     }
     match (t.phase, &t.clock) {
         (Phase::Focus, Clock::Ringing { .. }) | (Phase::Short | Phase::Long, Clock::Wound) => cycle_line(t),
+        _ if t.setting.is_some() => "release to set the length".into(),
         (_, Clock::Paused { .. }) => "the sky waits · space to resume".into(),
-        (_, Clock::Scrubbing { .. }) => "release to set the length".into(),
         (Phase::Focus, Clock::Wound) if s.teaching() => {
             "The sun sets as you focus.\nA finished block lights a lantern.".into()
         }
@@ -327,7 +327,12 @@ fn time_row(s: &State, k: Ink) -> El {
             let name = if *kept { "Block complete" } else { "Block skipped" };
             (log::duration(b.focused), Some("focused"), name, format!("{} focused", spoken_minutes(b.focused)))
         }
-        (Clock::Scrubbing { .. }, _) => (format!("{} min", t.length() / 60), None, "Length", spoken(t.length())),
+        _ if let Some(setting) = t.setting => {
+            let secs = t.length_of(setting.phase);
+            let (unit, name) =
+                if setting.phase == t.phase { (None, "Length") } else { (Some("next focus"), "Next focus length") };
+            (format!("{} min", secs / 60), unit, name, spoken(secs))
+        }
         (Clock::Paused { .. }, _) => {
             (mmss(t.shown(s.now)), Some("paused"), "Time remaining, paused", spoken(t.shown(s.now)))
         }
@@ -347,7 +352,7 @@ fn time_row(s: &State, k: Ink) -> El {
     }
     let mut r = row().gap(8.0).center_y();
     r = r.child(time);
-    if t.clock == Clock::Wound {
+    if t.clock == Clock::Wound && t.setting.is_none() {
         let shown = s.beckoned();
         r = r.child(el().w(6.0)).child(stepper(k, "shorter", "−", "A minute shorter  ↓", -1, shown)).child(stepper(
             k,

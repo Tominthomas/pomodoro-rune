@@ -10,13 +10,11 @@ fn the_digits_hide_only_while_a_focus_block_runs_uncalled() {
     let ticking = Clock::Ticking { ends_at: 60.0, tick: 1.0, run: run.clone() };
     let paused = Clock::Paused { secs: 60, since: 0.0, run };
     let ringing = Clock::Ringing { until: 9.0, kept: true, from: 1.0 };
-    let scrubbing = Clock::Scrubbing { secs: 600.0 };
     let table = [
         (Phase::Focus, &ticking, false, false, false),
         (Phase::Focus, &ticking, true, false, true),
         (Phase::Focus, &ticking, false, true, true),
         (Phase::Focus, &Clock::Wound, false, false, true),
-        (Phase::Focus, &scrubbing, false, false, true),
         (Phase::Focus, &paused, false, false, true),
         (Phase::Focus, &ringing, false, false, true),
         (Phase::Short, &ticking, false, false, true),
