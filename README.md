@@ -37,11 +37,20 @@ cargo run --release
 
 `rust-toolchain.toml` pins the Rust version, so rustup installs the right one on the first build.
 
+To install it as an app with its lantern icon, build the bundle and copy it into Applications:
+
+```sh
+tools/bundle.sh
+cp -R target/Pomodoro.app /Applications/
+```
+
+`tools/bundle.sh` builds the release binary, then writes `target/Pomodoro.app`, signed ad hoc, and `target/Pomodoro.dmg`. Only the app can post notifications. `cargo run` can't.
+
 ## How a block goes
 
 A block starts at 25 minutes. To change it before you start, drag the sun up or down, or press the arrow keys. Press Space, click the sky, or click **Start focus** to start. While a block waits, its controls stay in sight in the bottom right; once it runs they fade until you move the pointer. The sun sinks as the minutes run out.
 
-When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. Keep the window visible if you want to see when a block ends.
+When the sun reaches the sea, ripples spread across the water and a lantern lights. A line under the time counts the lanterns toward four, such as "1 of 4 lanterns · 5-minute break ready". The app asks how the block felt, and you can answer or ignore it. The timer is silent. If you run `Pomodoro.app` and allow its notifications, it tells you when a block or break ends while another app is in front. Under `cargo run`, keep the window visible if you want to see when a block ends.
 
 A five-minute break waits next. Press Space or click the sky to start it. After the fourth lantern, the break is fifteen minutes, and the lanterns rise into the night. When the break ends, dawn opens the next block, which waits for you to start it.
 
@@ -113,7 +122,7 @@ target/release/pomodoro --scene bell --theme dark --snap bell.png --at 2
 
 The Rust tests in `src/tests/` drive the same view and key handlers through Rune's `Runtime`, which needs no GPU. They press keys, click the sky, run blocks to their end, and relaunch from what was saved, and they fail if the time or the phase line is drawn too faint to read.
 
-`tools/ci.sh` runs every check in order: `cargo fmt`, spelling with `typos`, TOML formatting with `taplo`, unused dependencies with `cargo machete`, advisories, licenses and sources with `cargo deny`, file and folder size limits in `tools/shape.py`, `clippy`, the docs, the Rust tests, `ruff`, a check that `scripts/` matches `tools/scripts.py`, and the headless checks. CI installs the pinned versions of `typos`, `taplo`, `cargo machete` and `cargo deny`. Locally, the script skips any of them you haven't installed and says so. The headless checks need a Mac with a Metal GPU, `ffmpeg`, and `numpy`. GitHub Actions runs everything except the headless checks, because its macOS runners haven't been shown to render the app. `tools/readme-media.sh` regenerates the images on this page.
+`tools/ci.sh` runs every check in order: `cargo fmt`, spelling with `typos`, TOML formatting with `taplo`, unused dependencies with `cargo machete`, advisories, licenses and sources with `cargo deny`, file and folder size limits in `tools/shape.py`, `clippy`, the docs, the Rust tests, `ruff`, a check that `scripts/` matches `tools/scripts.py`, and the headless checks. CI installs the pinned versions of `typos`, `taplo`, `cargo machete` and `cargo deny`. Locally, the script skips any of them you haven't installed and says so. The headless checks need a Mac with a Metal GPU, `ffmpeg`, and `numpy`. GitHub Actions runs everything except the headless checks, because its macOS runners haven't been shown to render the app. Pushing a version tag such as `v0.1.0` (matching `Cargo.toml`) runs the Release workflow instead, which builds the app with `tools/bundle.sh` and publishes `Pomodoro.dmg` on a GitHub Release. Its Run workflow button builds one without releasing. `tools/readme-media.sh` regenerates the images on this page.
 
 ## Credits
 

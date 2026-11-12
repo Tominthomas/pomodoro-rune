@@ -1,0 +1,33 @@
+name: Release
+
+# Builds Pomodoro.dmg apart from CI, so every push stays quick. A pushed version tag publishes it
+# on a GitHub Release; "Run workflow" builds one and keeps it with the run.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - if: github.ref_type == 'tag'
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME isn't v$version from Cargo.toml" >&2; exit 1; }
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: tools/bundle.sh
+      - if: github.ref_type == 'tag'
+        run: gh release create "$GITHUB_REF_NAME" target/Pomodoro.dmg --title "Pomodoro ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # An artifact zip drops the binary's execute bit, so the disk image goes up as is.
+      - if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          path: target/Pomodoro.dmg
+          archive: false
