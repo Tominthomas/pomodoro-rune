@@ -245,6 +245,8 @@ SCRIPTS = {
         ]
     ]
     + [mark(16.8, "view")],
+    # Round one's audit: L pressed in Today, then a name full of shortcut letters.
+    "today-label": [*label(0.1, "Study the last unit, slowly"), mark(1.5, "end")],
     # A day of nineteen blocks, opened as a person opens Today.
     "busy-day": [key(0.3, "Escape"), key(0.6, "h"), mark(1.6, "open")],
     # Every key on one card.

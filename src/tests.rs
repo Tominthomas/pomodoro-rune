@@ -343,6 +343,46 @@ fn l_names_the_block_and_today_knows_what_it_was_for() {
 }
 
 #[test]
+fn l_from_today_names_the_next_block_and_its_letters_never_reach_the_timer() {
+    let mut app = App::new();
+    app.char("h");
+    app.look();
+    app.char("l");
+    app.look();
+    assert!(app.has("label-field") && !app.has("today-title"), "the field opens under the time, in sight");
+    // S skips, H opens Today, T changes place, U undoes, L names: here they are only letters.
+    app.typed("Study the last unit, slowly");
+    app.key(Key::Enter);
+    app.look();
+    assert_eq!(app.read("top-text").as_deref(), Some("Study the last unit, slowly"));
+    assert_eq!((app.time(), app.phase()), ("25:00".into(), "focus · click the sky or press space to begin".into()));
+    assert_eq!(app.rt.state.place, 0, "still at the coast");
+    app.space();
+    app.char("h");
+    app.look();
+    app.char("l");
+    app.typed("Then the hard set");
+    app.key(Key::Enter);
+    app.wait(2.0);
+    assert_eq!((app.phase(), app.read("top-text").as_deref()), ("focus".into(), Some("Then the hard set")));
+    assert!(app.rt.state.study.log.blocks.is_empty() && !app.has("undo"), "the running block was never ended");
+}
+
+#[test]
+fn a_name_being_typed_keeps_its_letters_even_when_its_field_lost_focus() {
+    let mut app = App::new();
+    app.char("l");
+    app.typed("Re");
+    app.rt.update(|_, tx| tx.blur());
+    app.wait(STEP);
+    app.typed("ad");
+    app.key(Key::Enter);
+    app.look();
+    assert_eq!(app.read("top-text").as_deref(), Some("Read"), "the field took its letters back");
+    assert_eq!((app.time(), app.rt.state.timer.phase), ("25:00".into(), Phase::Focus), "and the timer took none");
+}
+
+#[test]
 fn today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first() {
     let mut app = App::new();
     app.one_minute();

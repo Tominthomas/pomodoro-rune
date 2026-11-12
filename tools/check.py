@@ -34,6 +34,7 @@ FPS = {
     "bell": "60",
     "four-labels": "60",
     "busy-day": "30",
+    "today-label": "60",
 }
 # Scripts that start from one of the app's review scenes rather than an empty first launch.
 SCENE = {
@@ -42,6 +43,7 @@ SCENE = {
     "night": "night-minute",
     "four-labels": "today",
     "busy-day": "busy",
+    "today-label": "today",
 }
 YESTERDAY = (1_794_405_600 - 4 * 3600) // 86_400 - 1
 # Text a person must read is drawn at least this opaque: its colour's alpha times the opacity it
@@ -442,6 +444,18 @@ CHECKS = [
         ),
     ),
     ("Space starts it", "drag", "started", lambda t: phase(t) == "focus"),
+    (
+        "L in Today names the next block on the sunset, and its letters start, skip and open nothing",
+        "today-label",
+        "end",
+        lambda t: (
+            text(t, "top-text") == "Study the last unit, slowly"
+            and text(t, "time") == "25:00"
+            and "today-title" not in t
+            and "undo" not in t
+            and "Coast" in label(t, "control-place")
+        ),
+    ),
     (
         "a long label is cut short inside the window",
         "long-label",
