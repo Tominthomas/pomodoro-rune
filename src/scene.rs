@@ -342,7 +342,7 @@ pub fn view(s: &Scene<'_>) -> El {
         stage.child(water(s, &p, sun, sun_p, sun_vis, glow_k, moon.map(|_| moon_k).filter(|k| *k > 0.0)).a11y_hidden());
     stage =
         stage.child(canvas(ripple(s.sky, sun[0])).key("ripple").absolute(0.0, 0.0).size(W, H).blur(0.8).a11y_hidden());
-    stage = stage.child(el().key("grain").absolute(0.0, 0.0).size(W, H).pixels(grain()).a11y_hidden());
+    stage = stage.child(grain(W, H));
     stage = stage.child(
         el().key("dusk-veil")
             .a11y_hidden()
@@ -561,11 +561,27 @@ fn afterglow(place: &Place, progress: f32, k: f32) -> El {
         .linear_gradient(PI, [(0.0, warm.alpha(0.0)), (1.0, warm.alpha((0.5 * (1.0 - progress) + 0.06) * k))])
 }
 
+/// How wide the grain's tile is, in points. It holds two pixels a point, so on a Retina display
+/// each grain is one device pixel.
+const GRAIN_TILE: f32 = 128.0;
+
 /// A faint grain over the whole scene, finer than a level of colour, so gradients don't band.
-fn grain() -> &'static Pixels {
+/// One small tile repeats across `w` by `h`: noise this faint shows no seam or pattern, and the
+/// texture stays a 256 KiB tile at any window size.
+fn grain(w: f32, h: f32) -> El {
+    let (across, down) = ((w / GRAIN_TILE).ceil() as u32, (h / GRAIN_TILE).ceil() as u32);
+    let mut layer = el().key("grain").absolute(0.0, 0.0).size(w, h).clip_rounded(0.0).inert().a11y_hidden();
+    for i in 0..across * down {
+        let (x, y) = ((i % across) as f32 * GRAIN_TILE, (i / across) as f32 * GRAIN_TILE);
+        layer = layer.child(el().absolute(x, y).size(GRAIN_TILE, GRAIN_TILE).pixels(grain_tile()));
+    }
+    layer
+}
+
+fn grain_tile() -> &'static Pixels {
     static GRAIN: OnceLock<Pixels> = OnceLock::new();
     GRAIN.get_or_init(|| {
-        let (w, h) = (W as u32 * 2, H as u32 * 2);
+        let (w, h) = (GRAIN_TILE as u32 * 2, GRAIN_TILE as u32 * 2);
         let mut rgba = Vec::with_capacity((w * h * 4) as usize);
         for i in 0..w * h {
             let n = hash(i.wrapping_mul(2654435761) ^ 0x5bd1);
