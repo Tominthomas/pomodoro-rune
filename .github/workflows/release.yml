@@ -22,7 +22,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: tools/bundle.sh
       - if: github.ref_type == 'tag'
-        run: gh release create "$GITHUB_REF_NAME" target/Pomodoro.dmg --title "Pomodoro ${GITHUB_REF_NAME#v}" --generate-notes
+        # A Release published on GitHub's page already exists by the time its new tag starts this run.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" target/Pomodoro.dmg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" target/Pomodoro.dmg --title "Pomodoro ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
       # An artifact zip drops the binary's execute bit, so the disk image goes up as is.
