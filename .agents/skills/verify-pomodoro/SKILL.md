@@ -58,7 +58,7 @@ A proof follows the user's path. It presses the keys, taps the keyed controls or
 
 ## Cleanup
 
-Headless commands exit on their own, so there are no processes to stop. Delete throwaway script JSON and temp renders outside `$RUN`, and keep `$RUN`. If you started a real window yourself, kill only the pid you recorded with `$!`. Never use `pkill pomodoro` or `killall`. Tomin may have the app open, and a kill skips the save that runs on quit. Then confirm the proof survived with `ls "$RUN"`.
+Headless commands exit on their own, so there are no processes to stop. Delete throwaway script JSON and temp renders outside `$RUN`, and keep `$RUN`. If you started a real window yourself, kill only the pid you recorded with `$!`. Never use `pkill pomodoro` or `killall`. The person you're working for may have the app open, and a kill skips the save that runs on quit. Then confirm the proof survived with `ls "$RUN"`.
 
 ## Helpers
 
@@ -80,7 +80,7 @@ Headless can't show these. Verify them in the real window or list them as unveri
 - Window chrome, dragging the window, live resizing with the pointer, the frame remembered across launches (`rune_mac::remember_frame`), the Dock icon and the app icon. Headless `--size` proves each size's layout, not the drag between them.
 - Following the system appearance live. Headless takes `--theme` once.
 
-The agent shell here runs in Tomin's Aqua login session (`launchctl managername` prints `Aqua`). It has no Screen Recording permission (`screencapture -x` fails with "could not create image from display"). System Events scripting fails too (`osascript` gives syntax error -2741 on `application process`). So no agent has driven or captured the real window yet. Hand Tomin this checklist with the build and ask for a screenshot of each step.
+An agent shell without Screen Recording and Accessibility permission can't capture or drive the real window: `screencapture -x` fails with "could not create image from display", and `osascript` gives syntax error -2741 on `application process`. No agent has driven or captured the real window yet. Hand a person this checklist with the build and ask for a screenshot of each step.
 
 1. Quit any running Pomodoro. Run `cargo run --release` (or open the installed bundle).
 2. Hover a control. The tooltip names the key, for example "Start focus  Space".
@@ -91,4 +91,4 @@ The agent shell here runs in Tomin's Aqua login session (`launchctl managername`
 7. Untick View > Sound and run another one-minute block. The lantern lights and nothing sounds.
 8. Start a block and close the window with the red button. The app keeps running, a sun with the minutes left shows by the clock, and the first close posts a note that it is there (bundle only). Click the sun: the menu offers Pause, Skip, today's total, Open Pomodoro, Sound and Quit. Open Pomodoro brings the window back, and so does the Dock icon. Quit from the menu quits.
 
-The permission-gated path is untested, and every step of it is unproven. Rune's installer is pinned to the app's Rune revision at `~/.cargo/git/checkouts/rune-c9b805e9ed8a3730/bb310fc/scripts/mac-app`. `tools/bundle.sh` builds and signs `target/Pomodoro.app` without launching it, and its static checks (signature, `Info.plist`, icon) need no permission. `mac-app --name Pomodoro --id dev.tomin.pomodoro --exe pomodoro --bundle target/Pomodoro.app --no-rune-ready` installs that bundle to `~/Applications/Pomodoro.app` and launches it. That launch uses the real prefs. Find the window's CGWindowID (no tool for that is installed here yet), capture it with `screencapture -l <windowid> "$RUN/window.png"`, and send input with System Events. All of that needs Tomin to grant Screen Recording and Accessibility to the T3 service. Before relying on any of it, run it once end to end and update this section.
+The permission-gated path is untested, and every step of it is unproven. Rune's installer is `scripts/mac-app` in the Rune checkout Cargo fetched for the revision pinned in `Cargo.toml` (under `~/.cargo/git/checkouts/`). `tools/bundle.sh` builds and signs `target/Pomodoro.app` without launching it, and its static checks (signature, `Info.plist`, icon) need no permission. `mac-app --name Pomodoro --id dev.tomin.pomodoro --exe pomodoro --bundle target/Pomodoro.app --no-rune-ready` installs that bundle to `~/Applications/Pomodoro.app` and launches it. That launch uses the real prefs. Find the window's CGWindowID, capture it with `screencapture -l <windowid> "$RUN/window.png"`, and send input with System Events. All of that needs Screen Recording and Accessibility granted to the process the agent runs in. Before relying on any of it, run it once end to end and update this section.
