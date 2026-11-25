@@ -362,8 +362,8 @@ CHECKS = [
         "cycle",
         "today",
         lambda t: (
-            text(t, "stat-lanterns-value") == "4"
-            and text(t, "stat-skipped-value") == "1"
+            text(t, "stat-lanterns") == "4 lanterns lit"
+            and text(t, "stat-skipped") == "1 skipped"
             and "stat-sessions" not in t
             and len(lanterns(t, "day-lantern-")) == 4
             and len(lanterns(t, "day-ring-")) == 1
@@ -451,7 +451,7 @@ CHECKS = [
         "and it reaches its bell as one block",
         "undo",
         "today",
-        lambda t: text(t, "stat-lanterns-value") == "1" and "stat-skipped" not in t and "day-ring-0" not in t,
+        lambda t: text(t, "stat-lanterns") == "1 lantern lit" and "stat-skipped" not in t and "day-ring-0" not in t,
     ),
     (
         "the click that brings the window forward starts nothing",
@@ -598,7 +598,6 @@ CHECKS = [
             and t["day-lantern-14"]["rect"][0] >= t["day-strip-view"]["rect"][0]
         ),
     ),
-    ("and with the strip's key row under its marks", "cycle", "today", lambda t: fits(t) and "strip-key" in t),
     ("the keys card wraps its rows inside the window", "keys", "open", lambda t: fits(t) and "key-what-2" in t),
     (
         "the keys card hides the scene behind it, which the veil around it still shows",
@@ -641,7 +640,7 @@ CHECKS = [
         "a click on Today's background leaves it open",
         "today",
         "clicked",
-        lambda t: text(t, "today-title") == "Today" and ("strip-note" in t or "strip-key" in t),
+        lambda t: text(t, "today-title") == "Today" and "day-lantern-0" in t,
     ),
     (
         "a lantern in Today opens its block on two lines, clear of its close button",
@@ -668,7 +667,7 @@ CHECKS = [
             text(t, "today-title") == "Tuesday"
             and "back-to-today" in t
             and "now" not in t
-            and text(t, "stat-lanterns-value") != "4"
+            and text(t, "stat-lanterns") != "4 lanterns lit"
         ),
     ),
     (

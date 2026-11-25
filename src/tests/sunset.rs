@@ -185,7 +185,7 @@ fn s_skips_a_block_and_u_takes_it_back_so_it_counts_once_finished() {
     assert_eq!((back.phase(), back.lanterns()), ("1 of 4 lanterns · 5-minute break ready".into(), 1));
     back.char("h");
     back.look();
-    assert_eq!((back.read("stat-lanterns-value").as_deref(), back.has("stat-skipped")), (Some("1"), false));
+    assert_eq!((back.read("stat-lanterns").as_deref(), back.has("stat-skipped")), (Some("1 lantern lit"), false));
 }
 
 #[test]
