@@ -100,7 +100,7 @@ The same sunset over Coast, Lake, and Mesa. Press `T` to switch. The app follows
 
 Press `H` for Today. It shows today's lanterns on a timeline, the time you focused, what you worked on, how the blocks felt, and a grid of the last four weeks. A study day starts at 4 a.m., so a late night counts toward the evening it began in.
 
-<img src="assets/readme/today.png" alt="The Today page in light and dark mode: a timeline of the day's lanterns, 1 h 49 min focused, 4 lanterns lit, time per label, a bar of how the blocks felt, and a four-week grid">
+<img src="assets/readme/today.png" alt="The Today page in light and dark mode: a timeline of the day's lanterns, 1 h 49 min focused, 4 lanterns lit, time per label, how the blocks felt, and a four-week grid of small sunsets">
 
 Labels and feelings are optional. If you don't answer how a block felt, the question fades 30 seconds into the break.
 

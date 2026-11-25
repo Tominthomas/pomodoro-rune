@@ -13,14 +13,14 @@ use crate::theme::rgb;
 use crate::today::{DAYS, Ledger, MONTHS, label, nav};
 use crate::{State, guarded};
 
-const GAP: f32 = 5.0;
+const GAP: f32 = 6.0;
 /// Narrower than this, a hovered day's summary doesn't fit beside "Four weeks" and its dates, so
 /// it goes under them, hovered or not, and the grid doesn't jump as the pointer moves.
 const BESIDE: f32 = 320.0;
 /// A day's sunset fills the width, seven to a week.
 /// A day's tile across a week of `wide` points, and its height.
 fn tile(wide: f32) -> (f32, f32) {
-    ((wide - 6.0 * GAP) / 7.0, 22.0 * (wide / 336.0).clamp(1.0, 1.3))
+    ((wide - 6.0 * GAP) / 7.0, 30.0 * (wide / 336.0).clamp(1.0, 1.3))
 }
 /// Where the sea meets the sky in a tile, from its top.
 const SHORE: f32 = 0.62;
@@ -65,7 +65,7 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
     };
     let head = DAYS
         .iter()
-        .fold(row().gap(GAP), |r, d| r.child(el().w(tile(l.wide).0).child(label(k, &d[..1], 10.5, 500.0, 0.9))));
+        .fold(row().gap(GAP), |r, d| r.child(el().w(tile(l.wide).0).child(label(k, &d[..1], 11.0, 500.0, 0.9))));
     // Arrows move between days without opening each one, since opening scrolls the page away
     // from the grid; Return or Space opens the day reached.
     let mut weeks = col().gap(GAP).focus_group();
@@ -77,14 +77,14 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
         .key("history-scale")
         .gap(5.0)
         .center_y()
-        .child(label(k, "less", 10.5, 450.0, 0.9))
+        .child(label(k, "less", 11.0, 450.0, 0.9))
         .child(samples)
-        .child(label(k, "more focus · a dot is a lantern", 10.5, 450.0, 0.9));
+        .child(label(k, "more focus · a dot is a lantern", 11.0, 450.0, 0.9));
     let heading = row()
         .gap(8.0)
         .center_y()
         .child(label(k, "Four weeks", 12.0, 520.0, 0.92))
-        .child(label(k, &span(&days), 10.5, 450.0, 0.8).key("history-span"));
+        .child(label(k, &span(&days), 11.0, 450.0, 0.9).key("history-span"));
     let aside = text(aside).key("evenings").font(TextStyle::new(11.0, 480.0)).color(k.text.alpha(0.9));
     let top = if l.wide < BESIDE {
         col().gap(4.0).child(heading).child(aside)
@@ -93,9 +93,9 @@ pub fn view(l: &Ledger<'_>, today: Day) -> El {
     };
     col()
         .child(top)
-        .child(el().h(6.0))
+        .child(el().h(10.0))
         .child(col().key("history").gap(GAP).child(head).child(weeks))
-        .child(el().h(8.0))
+        .child(el().h(12.0))
         .child(scale)
 }
 
@@ -134,8 +134,9 @@ fn sunset(l: &Ledger<'_>, step: usize, lit: u32, (w, h): (f32, f32)) -> El {
         .child(canvas(sea).absolute(0.0, 0.0).size(w, h).a11y_hidden())
 }
 
-/// A day: its date, quiet over its sunset. A past day with no focus is still water under a pale
-/// sky; a day still to come is only an outline, so the two never read alike.
+/// A day as its sunset alone; its date and numbers head the grid while the pointer or the keyboard
+/// is on it. A past day with no focus is still water under a pale sky; a day still to come is
+/// only an outline, so the two never read alike.
 fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let k = l.ink();
     let (tw, th) = tile(l.wide);
@@ -143,17 +144,14 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
     let d = day.date();
     let named = format!("{} {} {}", DAYS[day.weekday() as usize], d.day, MONTHS[d.month as usize - 1]);
     let named = if day == today { format!("{named}, today") } else { named };
-    let number = label(k, &d.day.to_string(), 9.5, if day == today { 640.0 } else { 480.0 }, 0.95);
-    let column = |tile: El| col().gap(2.0).child(number).child(tile);
     if day > today {
-        return column(
-            el().key(key)
-                .size(tw, th)
-                .radius(6.0)
-                .border(1.0, k.text.alpha(0.24))
-                .role("img")
-                .label(format!("{named}, still to come")),
-        );
+        return el()
+            .key(key)
+            .size(tw, th)
+            .radius(6.0)
+            .border(1.0, k.text.alpha(0.24))
+            .role("img")
+            .label(format!("{named}, still to come"));
     }
     let t = l.log.totals_on(l.cal, day);
     let spoken = if t.blocks == 0 {
@@ -199,9 +197,9 @@ fn cell(l: &Ledger<'_>, day: Day, today: Day) -> El {
             // page, under the date it now shows.
             tx.scroll_to("today-scroll", 0.0, 0.0);
         }));
-    column(match (l.day == day, day == today) {
+    match (l.day == day, day == today) {
         (true, _) => base.border(2.0, k.text.alpha(0.95)),
         (false, true) => base.border(1.2, k.text.alpha(0.6)),
         _ => base.border(1.0, k.text.alpha(0.12)),
-    })
+    }
 }

@@ -5,8 +5,8 @@
 ## Sub-features
 
 - `today-open` opens Today with `H` or the `control-today` control (labelled Today) and closes it with `H`, `Esc` or `today-close` (Back to sunset). The `timer-bar` at the top shows the running timer and takes Pause, Resume, Start and Undo skip.
-- `today-numbers` shows `stat-focused-value`, `stat-lanterns-value` and `stat-skipped-value`, the `day-lantern-N` and `day-ring-N` marks, `for-<label>` and `reflected`.
-- `today-marks` names each mark `Open block: <time, duration, …>` (`Close block: …` while it is open), and until a block has been opened, `strip-cue` under `strip-key` reads `Select a lantern or ring to open the block`. The `opened-block` pref keeps it away after that. Headless runs start with the cue, since their prefs are empty.
+- `today-numbers` shows `stat-focused-value`, `stat-lanterns` and `stat-skipped`, the `day-lantern-N` and `day-ring-N` marks, `for-<label>` and `reflected`.
+- `today-marks` names each mark `Open block: <time, duration, …>` (`Close block: …` while it is open), and until a block has been opened, `strip-cue` under the strip reads `Select a lantern or ring to open the block`. The `opened-block` pref keeps it away after that. Headless runs start with the cue, since their prefs are empty.
 - `today-detail` opens a block from its mark into `detail`, with `detail-when` and `detail-about`.
 - `today-felt` gives, changes or clears a block's feeling with `detail-felt-deep`, `detail-felt-steady` and `detail-felt-drifting`.
 - `today-rename` renames a block with `detail-rename` and `detail-label-field`.
@@ -37,7 +37,7 @@ Preconditions:
   {"events":[{"t":0.5,"type":"tap","key":"day-lantern-0"},{"t":1.2,"type":"tap","key":"detail-rename"},{"t":1.5,"type":"key","name":"a","cmd":true},{"t":1.6,"type":"type","text":"Essay draft"},{"t":2.4,"type":"key","name":"Enter"},{"t":3.0,"type":"mark","name":"renamed"}]}
   ```
 
-- **A whole day's numbers.** Run `look scripts/cycle.json --at mark:today --fps 10 'stat-*' 'day-lantern-*' 'day-ring-*' reflected 'for-*'`. `stat-lanterns-value` reads `4`, `stat-skipped-value` reads `1`, `stat-focused-value` reads `5 min`, `reflected` reads `you said how 1 of 4 felt` and `for-Reading & notes` exists.
+- **A whole day's numbers.** Run `look scripts/cycle.json --at mark:today --fps 10 'stat-*' 'day-lantern-*' 'day-ring-*' reflected 'for-*'`. `stat-lanterns` reads `4 lanterns lit`, `stat-skipped` reads `1 skipped`, `stat-focused-value` reads `5 min`, `reflected` reads `you said how 1 of 4 felt` and `for-Reading & notes` exists.
 - **Escape order and relaunch.** Run `cargo test --release today_opens_a_block_and_a_past_day_and_escape_closes_the_innermost_first` and `cargo test --release l_names_the_block_and_today_knows_what_it_was_for`. Both pass.
 - **Proof.** Run `python3 tools/check.py today cycle | tee $RUN/check.txt` and `app --scene today --script scripts/today.json --video $RUN/today.mp4 --fps 30 --pointer`.
 

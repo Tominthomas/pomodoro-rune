@@ -144,11 +144,11 @@ fn todays_marks_say_they_open_their_block_and_the_cue_goes_once_one_is_opened() 
     assert!(!app.has("strip-cue"), "the cue has done its work");
     app.tap("day-lantern-0");
     app.look();
-    assert!(app.has("strip-key") && !app.has("strip-cue"), "and stays away once the block is closed");
+    assert!(!app.has("strip-cue"), "and stays away once the block is closed");
     let mut back = app.relaunch(60.0);
     back.char("h");
     back.look();
-    assert!(back.has("strip-key") && !back.has("strip-cue"), "and after a relaunch");
+    assert!(!back.has("strip-cue"), "and after a relaunch");
 }
 
 #[test]
